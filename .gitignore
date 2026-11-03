@@ -1,0 +1,8 @@
+build/
+build-*/
+*.sqlite3
+*.db
+*.log
+.cache/
+.vscode/
+.idea/

@@ -1,0 +1,10 @@
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++20
+IndentWidth: 4
+ColumnLimit: 120
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Inline
+BreakBeforeBraces: Attach
+FixNamespaceComments: true
+SortIncludes: CaseSensitive
