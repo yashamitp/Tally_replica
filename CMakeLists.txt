@@ -18,6 +18,7 @@ add_library(TallyCore
     src/database/DatabaseManager.cpp
     src/database/migrations/SchemaMigrations.cpp
     src/services/CompanyService.cpp
+    src/services/GroupService.cpp
     src/services/LedgerService.cpp
     src/services/VoucherService.cpp
     src/services/DayBookService.cpp
@@ -48,13 +49,24 @@ target_link_libraries(TallyCore PUBLIC
 add_library(TallyUI
     src/ui/theme/TallyTheme.cpp
     src/ui/dialogs/GoToDialog.cpp
-    src/ui/gateway/GatewayView.cpp
+    src/ui/dialogs/DateDialog.cpp
+    src/ui/company/CompanyDialog.cpp
+    src/ui/masters/LedgerDialog.cpp
+    src/ui/masters/GroupDialog.cpp
+    src/ui/masters/MasterSelectionDialog.cpp
+    src/ui/vouchers/VoucherDetailsDialog.cpp
     src/ui/vouchers/VoucherEntryView.cpp
     src/ui/reports/DayBookView.cpp
     src/ui/reports/TrialBalanceView.cpp
     src/ui/reports/ProfitLossView.cpp
     src/ui/reports/BalanceSheetView.cpp
     src/ui/reports/LedgerStatementView.cpp
+    src/ui/reports/GroupSummaryView.cpp
+    src/ui/exchange/ImportDialog.cpp
+    src/ui/exchange/ExportDialog.cpp
+    src/ui/exchange/ExchangeDialog.cpp
+    src/ui/backup/BackupRestoreDialog.cpp
+    src/ui/gateway/GatewayView.cpp
     src/ui/shell/MainWindow.cpp
 )
 
@@ -105,3 +117,20 @@ add_test(NAME test_tally_xml COMMAND test_tally_xml)
 add_executable(test_json_exchange tests/integration/test_json_exchange.cpp)
 target_link_libraries(test_json_exchange PRIVATE TallyCore)
 add_test(NAME test_json_exchange COMMAND test_json_exchange)
+
+add_executable(test_masters tests/unit/test_masters.cpp)
+target_link_libraries(test_masters PRIVATE TallyCore)
+add_test(NAME test_masters COMMAND test_masters)
+
+add_executable(test_backup_restore tests/unit/test_backup_restore.cpp)
+target_link_libraries(test_backup_restore PRIVATE TallyCore)
+add_test(NAME test_backup_restore COMMAND test_backup_restore)
+
+# CPack Packaging Configuration
+install(TARGETS TallyReplica DESTINATION bin)
+set(CPACK_PACKAGE_NAME "TallyReplica")
+set(CPACK_PACKAGE_VENDOR "Antigravity")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Antigravity Accounting - Native C++20 / Qt 6 TallyPrime Compatible System")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_GENERATOR "TGZ;STGZ")
+include(CPack)

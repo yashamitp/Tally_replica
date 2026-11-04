@@ -7,6 +7,7 @@
 #include <QLabel>
 #include "../../application/NavigationManager.hpp"
 #include "../../services/LedgerService.hpp"
+#include "../../services/VoucherService.hpp"
 
 namespace tally::ui {
 
@@ -17,6 +18,7 @@ public:
     LedgerStatementView(
         application::NavigationManager& navManager,
         services::LedgerService& ledgerService,
+        services::VoucherService& voucherService,
         QWidget* parent = nullptr
     );
 
@@ -29,6 +31,7 @@ protected:
 
 private slots:
     void onLedgerSelectionChanged(int index);
+    void onRowDoubleClicked(int row, int column);
 
 private:
     void setupUi();
@@ -36,6 +39,7 @@ private:
 
     application::NavigationManager& m_navManager;
     services::LedgerService& m_ledgerService;
+    services::VoucherService& m_voucherService;
     std::string m_companyId;
     std::string m_selectedLedgerId;
 

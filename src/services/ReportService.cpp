@@ -684,4 +684,97 @@ BalanceSheetReport ReportService::generateBalanceSheet(
     return report;
 }
 
+GroupSummaryReport ReportService::generateGroupSummary(
+    const std::string& companyId,
+    const std::string& groupId,
+    const std::optional<std::string>& fromDate,
+    const std::optional<std::string>& toDate
+) {
+    GroupSummaryReport report;
+    report.groupId = groupId;
+    report.period = resolvePeriod(companyId, fromDate, toDate);
+
+    // Fetch company name
+    QSqlQuery cQuery(m_dbManager.database());
+    cQuery.prepare("SELECT name FROM companies WHERE id = :cid");
+    cQuery.bindValue(":cid", QString::fromStdString(companyId));
+    if (cQuery.exec() && cQuery.next()) {
+        report.companyName = cQuery.value(0).toString().toStdString();
+    }
+
+    // Fetch group details
+    domain::GroupNature groupNature = domain::GroupNature::Asset;
+    QSqlQuery gQuery(m_dbManager.database());
+    gQuery.prepare("SELECT name, nature FROM accounting_groups WHERE id = :gid AND company_id = :cid");
+    gQuery.bindValue(":gid", QString::fromStdString(groupId));
+    gQuery.bindValue(":cid", QString::fromStdString(companyId));
+    if (gQuery.exec() && gQuery.next()) {
+        report.groupName = gQuery.value(0).toString().toStdString();
+        groupNature = domain::groupNatureFromString(gQuery.value(1).toString().toStdString());
+    }
+
+    // Use generateTrialBalance internally to get accurate pre/period/closing numbers across the tree
+    auto tb = generateTrialBalance(companyId, report.period.startDate, report.period.endDate, true);
+
+    // Find our group in trial balance tree
+    std::function<const TrialBalanceGroupNode*(const std::vector<TrialBalanceGroupNode>&)> findNode;
+    findNode = [&](const std::vector<TrialBalanceGroupNode>& nodes) -> const TrialBalanceGroupNode* {
+        for (const auto& node : nodes) {
+            if (node.groupId == groupId) return &node;
+            auto* sub = findNode(node.subGroups);
+            if (sub) return sub;
+        }
+        return nullptr;
+    };
+
+    const TrialBalanceGroupNode* targetNode = findNode(tb.groups);
+    if (targetNode) {
+        // Add sub-groups
+        for (const auto& sg : targetNode->subGroups) {
+            GroupSummaryItem item;
+            item.id = sg.groupId;
+            item.name = sg.groupName;
+            item.isGroup = true;
+            item.openingDebit = sg.openingDebit;
+            item.openingCredit = sg.openingCredit;
+            item.periodDebit = sg.periodDebit;
+            item.periodCredit = sg.periodCredit;
+            item.closingDebit = sg.closingDebit;
+            item.closingCredit = sg.closingCredit;
+            report.items.push_back(item);
+
+            report.totalOpeningDebit = report.totalOpeningDebit.add(sg.openingDebit);
+            report.totalOpeningCredit = report.totalOpeningCredit.add(sg.openingCredit);
+            report.totalPeriodDebit = report.totalPeriodDebit.add(sg.periodDebit);
+            report.totalPeriodCredit = report.totalPeriodCredit.add(sg.periodCredit);
+            report.totalClosingDebit = report.totalClosingDebit.add(sg.closingDebit);
+            report.totalClosingCredit = report.totalClosingCredit.add(sg.closingCredit);
+        }
+
+        // Add ledgers
+        for (const auto& l : targetNode->ledgers) {
+            GroupSummaryItem item;
+            item.id = l.ledgerId;
+            item.name = l.ledgerName;
+            item.isGroup = false;
+            item.openingDebit = l.openingDebit;
+            item.openingCredit = l.openingCredit;
+            item.periodDebit = l.periodDebit;
+            item.periodCredit = l.periodCredit;
+            item.closingDebit = l.closingDebit;
+            item.closingCredit = l.closingCredit;
+            report.items.push_back(item);
+
+            report.totalOpeningDebit = report.totalOpeningDebit.add(l.openingDebit);
+            report.totalOpeningCredit = report.totalOpeningCredit.add(l.openingCredit);
+            report.totalPeriodDebit = report.totalPeriodDebit.add(l.periodDebit);
+            report.totalPeriodCredit = report.totalPeriodCredit.add(l.periodCredit);
+            report.totalClosingDebit = report.totalClosingDebit.add(l.closingDebit);
+            report.totalClosingCredit = report.totalClosingCredit.add(l.closingCredit);
+        }
+    }
+
+    return report;
+}
+
 } // namespace tally::services

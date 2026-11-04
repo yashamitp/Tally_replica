@@ -11,6 +11,7 @@
 #include "../../services/VoucherService.hpp"
 #include "../../services/DayBookService.hpp"
 #include "../../services/ReportService.hpp"
+#include "../../services/GroupService.hpp"
 #include "../../application/NavigationManager.hpp"
 #include "../gateway/GatewayView.hpp"
 #include "../vouchers/VoucherEntryView.hpp"
@@ -19,6 +20,7 @@
 #include "../reports/ProfitLossView.hpp"
 #include "../reports/BalanceSheetView.hpp"
 #include "../reports/LedgerStatementView.hpp"
+#include "../reports/GroupSummaryView.hpp"
 
 namespace tally::ui {
 
@@ -30,6 +32,7 @@ public:
     ~MainWindow() override;
 
     bool initialize(const std::string& dbPath = ":memory:");
+    void switchActiveCompany(const std::string& companyId);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -37,6 +40,14 @@ protected:
 private slots:
     void onScreenChanged(application::ScreenId newScreen, const std::string& param);
     void onOpenGoToDialog();
+    void onCompanyClicked();
+    void onDateClicked();
+    void onBackupRestoreClicked();
+    void onExchangeClicked();
+    void onImportClicked();
+    void onExportClicked();
+    void onMasterCreationClicked();
+    void onMasterAlterationClicked();
 
 private:
     void setupUi();
@@ -46,6 +57,7 @@ private:
 
     std::unique_ptr<database::DatabaseManager> m_dbManager;
     std::unique_ptr<services::CompanyService> m_companyService;
+    std::unique_ptr<services::GroupService> m_groupService;
     std::unique_ptr<services::LedgerService> m_ledgerService;
     std::unique_ptr<services::VoucherService> m_voucherService;
     std::unique_ptr<services::DayBookService> m_dayBookService;
@@ -53,6 +65,9 @@ private:
 
     application::NavigationManager m_navManager;
     std::string m_currentCompanyId;
+    std::string m_currentDate = "2026-04-01";
+    std::string m_fromDate = "2026-04-01";
+    std::string m_toDate = "2027-03-31";
 
     QStackedWidget* m_stackedWidget;
     GatewayView* m_gatewayView;
@@ -62,6 +77,7 @@ private:
     ProfitLossView* m_profitLossView;
     BalanceSheetView* m_balanceSheetView;
     LedgerStatementView* m_ledgerStatementView;
+    GroupSummaryView* m_groupSummaryView;
 
     QLabel* m_topCompanyLabel;
     QLabel* m_bottomStatusLabel;

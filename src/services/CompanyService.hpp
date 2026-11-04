@@ -35,6 +35,8 @@ public:
     domain::Company createCompany(const CreateCompanyParams& params);
     std::vector<domain::Company> listCompanies();
     std::optional<domain::Company> getCompany(const std::string& id);
+    bool alterCompany(const domain::Company& company);
+    bool deleteCompany(const std::string& id);
     std::vector<domain::AccountingGroup> listGroups(const std::string& companyId);
     std::vector<domain::VoucherType> listVoucherTypes(const std::string& companyId);
 

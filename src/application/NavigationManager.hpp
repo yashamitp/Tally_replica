@@ -15,6 +15,7 @@ enum class ScreenId {
     ProfitLoss,
     BalanceSheet,
     LedgerStatement,
+    GroupSummary,
     MasterCreation,
     MasterAlteration
 };

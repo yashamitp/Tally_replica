@@ -149,6 +149,33 @@ struct BalanceSheetReport {
     domain::ExactDecimal discrepancy = domain::ExactDecimal::zero();
 };
 
+// 4. Group Summary
+struct GroupSummaryItem {
+    std::string id;
+    std::string name;
+    bool isGroup = false;
+    domain::ExactDecimal openingDebit = domain::ExactDecimal::zero();
+    domain::ExactDecimal openingCredit = domain::ExactDecimal::zero();
+    domain::ExactDecimal periodDebit = domain::ExactDecimal::zero();
+    domain::ExactDecimal periodCredit = domain::ExactDecimal::zero();
+    domain::ExactDecimal closingDebit = domain::ExactDecimal::zero();
+    domain::ExactDecimal closingCredit = domain::ExactDecimal::zero();
+};
+
+struct GroupSummaryReport {
+    std::string companyName;
+    std::string groupId;
+    std::string groupName;
+    ReportPeriod period;
+    std::vector<GroupSummaryItem> items;
+    domain::ExactDecimal totalOpeningDebit = domain::ExactDecimal::zero();
+    domain::ExactDecimal totalOpeningCredit = domain::ExactDecimal::zero();
+    domain::ExactDecimal totalPeriodDebit = domain::ExactDecimal::zero();
+    domain::ExactDecimal totalPeriodCredit = domain::ExactDecimal::zero();
+    domain::ExactDecimal totalClosingDebit = domain::ExactDecimal::zero();
+    domain::ExactDecimal totalClosingCredit = domain::ExactDecimal::zero();
+};
+
 class ReportService {
 public:
     explicit ReportService(database::DatabaseManager& dbManager);
@@ -169,6 +196,13 @@ public:
     BalanceSheetReport generateBalanceSheet(
         const std::string& companyId,
         const std::optional<std::string>& asOfDate = std::nullopt
+    );
+
+    GroupSummaryReport generateGroupSummary(
+        const std::string& companyId,
+        const std::string& groupId,
+        const std::optional<std::string>& fromDate = std::nullopt,
+        const std::optional<std::string>& toDate = std::nullopt
     );
 
 private:

@@ -54,6 +54,15 @@ void ProfitLossView::setupUi() {
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_tree->header()->setSectionResizeMode(1, QHeaderView::Fixed);
     m_tree->setColumnWidth(1, 180);
+
+    connect(m_tree, &QTreeWidget::itemDoubleClicked, [this](QTreeWidgetItem* item, int) {
+        if (!item) return;
+        QString lid = item->data(0, Qt::UserRole).toString();
+        if (!lid.isEmpty()) {
+            m_navManager.navigateTo(application::ScreenId::LedgerStatement, lid.toStdString());
+        }
+    });
+
     mainLayout->addWidget(m_tree);
 
     // Footer Summary
@@ -122,6 +131,7 @@ void ProfitLossView::refreshData() {
         for (const auto& l : sec.ledgers) {
             QTreeWidgetItem* li = new QTreeWidgetItem(deHeader);
             li->setText(0, QString::fromStdString("   " + l.ledgerName));
+            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
             li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
             li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         }
@@ -165,6 +175,7 @@ void ProfitLossView::refreshData() {
         for (const auto& l : sec.ledgers) {
             QTreeWidgetItem* li = new QTreeWidgetItem(ieHeader);
             li->setText(0, QString::fromStdString("   " + l.ledgerName));
+            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
             li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
             li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         }
@@ -191,6 +202,16 @@ void ProfitLossView::refreshData() {
 void ProfitLossView::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
         m_navManager.navigateBack();
+    } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        auto* item = m_tree->currentItem();
+        if (item) {
+            QString lid = item->data(0, Qt::UserRole).toString();
+            if (!lid.isEmpty()) {
+                m_navManager.navigateTo(application::ScreenId::LedgerStatement, lid.toStdString());
+                return;
+            }
+        }
+        QWidget::keyPressEvent(event);
     } else {
         QWidget::keyPressEvent(event);
     }

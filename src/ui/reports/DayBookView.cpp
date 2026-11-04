@@ -3,14 +3,21 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
+#include "../vouchers/VoucherDetailsDialog.hpp"
 
 namespace tally::ui {
 
 DayBookView::DayBookView(
     application::NavigationManager& navManager,
     services::DayBookService& dayBookService,
+    services::VoucherService& voucherService,
+    services::LedgerService& ledgerService,
     QWidget* parent
-) : QWidget(parent), m_navManager(navManager), m_dayBookService(dayBookService) {
+) : QWidget(parent),
+    m_navManager(navManager),
+    m_dayBookService(dayBookService),
+    m_voucherService(voucherService),
+    m_ledgerService(ledgerService) {
     setupUi();
 }
 
@@ -66,6 +73,7 @@ void DayBookView::setupUi() {
 
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    connect(m_table, &QTableWidget::cellDoubleClicked, this, &DayBookView::onRowDoubleClicked);
     mainLayout->addWidget(m_table);
 
     // Bottom Summary
@@ -111,7 +119,9 @@ void DayBookView::refreshData() {
         int r = m_table->rowCount();
         m_table->insertRow(r);
 
-        m_table->setItem(r, 0, new QTableWidgetItem(QString::fromStdString(item.date)));
+        auto* dateItem = new QTableWidgetItem(QString::fromStdString(item.date));
+        dateItem->setData(Qt::UserRole, QString::fromStdString(item.id));
+        m_table->setItem(r, 0, dateItem);
         m_table->setItem(r, 1, new QTableWidgetItem(QString::fromStdString(item.particulars)));
         m_table->setItem(r, 2, new QTableWidgetItem(QString::fromStdString(item.voucherTypeName)));
         m_table->setItem(r, 3, new QTableWidgetItem(QString::fromStdString(item.voucherNumber)));
@@ -129,9 +139,26 @@ void DayBookView::refreshData() {
     m_totalCrLabel->setText(QString::fromStdString(result.totalCreditSum.formatInr(false)));
 }
 
+void DayBookView::onRowDoubleClicked(int row, int column) {
+    Q_UNUSED(column);
+    auto* item = m_table->item(row, 0);
+    if (!item) return;
+
+    std::string voucherId = item->data(Qt::UserRole).toString().toStdString();
+    if (voucherId.empty()) return;
+
+    VoucherDetailsDialog dlg(m_companyId, voucherId, m_voucherService, m_ledgerService, this);
+    if (dlg.exec() == QDialog::Accepted || dlg.voucherModified()) {
+        refreshData();
+    }
+}
+
 void DayBookView::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
         m_navManager.navigateBack();
+    } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        int r = m_table->currentRow();
+        if (r >= 0) onRowDoubleClicked(r, 0);
     } else {
         QWidget::keyPressEvent(event);
     }

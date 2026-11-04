@@ -56,6 +56,15 @@ void TrialBalanceView::setupUi() {
     m_tree->setColumnWidth(1, 160);
     m_tree->header()->setSectionResizeMode(2, QHeaderView::Fixed);
     m_tree->setColumnWidth(2, 160);
+
+    connect(m_tree, &QTreeWidget::itemDoubleClicked, [this](QTreeWidgetItem* item, int) {
+        if (!item) return;
+        QString lid = item->data(0, Qt::UserRole).toString();
+        if (!lid.isEmpty()) {
+            m_navManager.navigateTo(application::ScreenId::LedgerStatement, lid.toStdString());
+        }
+    });
+
     mainLayout->addWidget(m_tree);
 
     // Footer Summary
@@ -108,6 +117,7 @@ void TrialBalanceView::populateNode(QTreeWidgetItem* parentItem, const services:
     for (const auto& l : node.ledgers) {
         QTreeWidgetItem* lItem = new QTreeWidgetItem(item);
         lItem->setText(0, QString::fromStdString("   " + l.ledgerName));
+        lItem->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
         if (l.closingDebit > domain::ExactDecimal::zero()) {
             lItem->setText(1, QString::fromStdString(l.closingDebit.formatInr(false)));
             lItem->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
@@ -156,6 +166,16 @@ void TrialBalanceView::refreshData() {
 void TrialBalanceView::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape) {
         m_navManager.navigateBack();
+    } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        auto* item = m_tree->currentItem();
+        if (item) {
+            QString lid = item->data(0, Qt::UserRole).toString();
+            if (!lid.isEmpty()) {
+                m_navManager.navigateTo(application::ScreenId::LedgerStatement, lid.toStdString());
+                return;
+            }
+        }
+        QWidget::keyPressEvent(event);
     } else {
         QWidget::keyPressEvent(event);
     }

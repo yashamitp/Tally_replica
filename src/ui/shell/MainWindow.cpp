@@ -7,6 +7,13 @@
 #include <QApplication>
 #include "../theme/TallyTheme.hpp"
 #include "../dialogs/GoToDialog.hpp"
+#include "../dialogs/DateDialog.hpp"
+#include "../company/CompanyDialog.hpp"
+#include "../masters/MasterSelectionDialog.hpp"
+#include "../exchange/ImportDialog.hpp"
+#include "../exchange/ExportDialog.hpp"
+#include "../exchange/ExchangeDialog.hpp"
+#include "../backup/BackupRestoreDialog.hpp"
 #include "../../utilities/Logger.hpp"
 
 namespace tally::ui {
@@ -28,6 +35,7 @@ bool MainWindow::initialize(const std::string& dbPath) {
     }
 
     m_companyService = std::make_unique<services::CompanyService>(*m_dbManager);
+    m_groupService = std::make_unique<services::GroupService>(*m_dbManager);
     m_ledgerService = std::make_unique<services::LedgerService>(*m_dbManager);
     m_voucherService = std::make_unique<services::VoucherService>(*m_dbManager);
     m_dayBookService = std::make_unique<services::DayBookService>(*m_dbManager);
@@ -49,13 +57,7 @@ bool MainWindow::initialize(const std::string& dbPath) {
 
     connect(&m_navManager, &application::NavigationManager::screenChanged, this, &MainWindow::onScreenChanged);
 
-    m_gatewayView->refreshCompanyInfo(m_currentCompanyId);
-    m_voucherEntryView->setCompanyId(m_currentCompanyId);
-    m_dayBookView->setCompanyId(m_currentCompanyId);
-    m_trialBalanceView->setCompanyId(m_currentCompanyId);
-    m_profitLossView->setCompanyId(m_currentCompanyId);
-    m_balanceSheetView->setCompanyId(m_currentCompanyId);
-    m_ledgerStatementView->setCompanyId(m_currentCompanyId);
+    switchActiveCompany(m_currentCompanyId);
 
     utilities::Logger::info("MainWindow initialized successfully with company: " + m_currentCompanyId);
     return true;
@@ -80,11 +82,12 @@ void MainWindow::setupUi() {
 
     m_gatewayView = new GatewayView(m_navManager, *m_companyService, m_stackedWidget);
     m_voucherEntryView = new VoucherEntryView(m_navManager, *m_companyService, *m_ledgerService, *m_voucherService, m_stackedWidget);
-    m_dayBookView = new DayBookView(m_navManager, *m_dayBookService, m_stackedWidget);
+    m_dayBookView = new DayBookView(m_navManager, *m_dayBookService, *m_voucherService, *m_ledgerService, m_stackedWidget);
     m_trialBalanceView = new TrialBalanceView(m_navManager, *m_reportService, m_stackedWidget);
     m_profitLossView = new ProfitLossView(m_navManager, *m_reportService, m_stackedWidget);
     m_balanceSheetView = new BalanceSheetView(m_navManager, *m_reportService, m_stackedWidget);
-    m_ledgerStatementView = new LedgerStatementView(m_navManager, *m_ledgerService, m_stackedWidget);
+    m_ledgerStatementView = new LedgerStatementView(m_navManager, *m_ledgerService, *m_voucherService, m_stackedWidget);
+    m_groupSummaryView = new GroupSummaryView(m_navManager, *m_reportService, *m_groupService, m_stackedWidget);
 
     m_stackedWidget->addWidget(m_gatewayView);           // Index 0: Gateway
     m_stackedWidget->addWidget(m_voucherEntryView);      // Index 1: VoucherEntry
@@ -93,6 +96,7 @@ void MainWindow::setupUi() {
     m_stackedWidget->addWidget(m_profitLossView);        // Index 4: ProfitLoss
     m_stackedWidget->addWidget(m_balanceSheetView);      // Index 5: BalanceSheet
     m_stackedWidget->addWidget(m_ledgerStatementView);   // Index 6: LedgerStatement
+    m_stackedWidget->addWidget(m_groupSummaryView);      // Index 7: GroupSummary
 
     middleLayout->addWidget(m_stackedWidget, 1);
 
@@ -116,7 +120,7 @@ void MainWindow::setupTopBar() {
 
     QHBoxLayout* layout = new QHBoxLayout(topBar);
     layout->setContentsMargins(12, 0, 12, 0);
-    layout->setSpacing(12);
+    layout->setSpacing(10);
 
     QLabel* logo = new QLabel("TallyPrime", topBar);
     logo->setStyleSheet("font-size: 13pt; font-weight: bold; color: #FFFFFF;");
@@ -124,16 +128,32 @@ void MainWindow::setupTopBar() {
 
     layout->addSpacing(16);
 
-    QPushButton* compBtn = new QPushButton("K: Company", topBar);
-    QPushButton* dataBtn = new QPushButton("Y: Data", topBar);
-    QPushButton* exchBtn = new QPushButton("Z: Exchange", topBar);
+    QPushButton* compBtn = new QPushButton("K: Company (Alt+K)", topBar);
+    connect(compBtn, &QPushButton::clicked, this, &MainWindow::onCompanyClicked);
+
+    QPushButton* dataBtn = new QPushButton("Y: Data (Alt+Y)", topBar);
+    connect(dataBtn, &QPushButton::clicked, this, &MainWindow::onBackupRestoreClicked);
+
+    QPushButton* exchBtn = new QPushButton("Z: Exchange (Alt+Z)", topBar);
+    connect(exchBtn, &QPushButton::clicked, this, &MainWindow::onExchangeClicked);
+
     QPushButton* goToBtn = new QPushButton("G: Go To (Alt+G)", topBar);
     goToBtn->setStyleSheet("background-color: #2A6592; font-weight: bold; padding: 4px 10px; border-radius: 3px;");
     connect(goToBtn, &QPushButton::clicked, this, &MainWindow::onOpenGoToDialog);
 
-    QPushButton* impBtn = new QPushButton("O: Import", topBar);
-    QPushButton* expBtn = new QPushButton("E: Export", topBar);
+    QPushButton* impBtn = new QPushButton("O: Import (Alt+O)", topBar);
+    connect(impBtn, &QPushButton::clicked, this, &MainWindow::onImportClicked);
+
+    QPushButton* expBtn = new QPushButton("E: Export (Alt+E)", topBar);
+    connect(expBtn, &QPushButton::clicked, this, &MainWindow::onExportClicked);
+
     QPushButton* helpBtn = new QPushButton("F1: Help", topBar);
+    connect(helpBtn, &QPushButton::clicked, [this]() {
+        QMessageBox::about(this, "About Antigravity Accounting",
+            "<h3>Antigravity Accounting</h3>"
+            "<p>A native C++20 and Qt 6 desktop accounting system inspired by TallyPrime.</p>"
+            "<p>Enforces transactional double-entry invariants, exact decimal arithmetic, and real-time financial reconciliation.</p>");
+    });
 
     layout->addWidget(compBtn);
     layout->addWidget(dataBtn);
@@ -165,8 +185,8 @@ void MainWindow::setupRightSidebar() {
     };
 
     const std::vector<FKeyDef> buttons = {
-        {"F2: Date", [this]() {}},
-        {"F3: Company", [this]() {}},
+        {"F2: Date", [this]() { onDateClicked(); }},
+        {"F3: Company", [this]() { onCompanyClicked(); }},
         {"F4: Contra", [this]() {
             m_navManager.navigateTo(application::ScreenId::VoucherEntry);
             m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Contra);
@@ -191,7 +211,7 @@ void MainWindow::setupRightSidebar() {
             m_navManager.navigateTo(application::ScreenId::VoucherEntry);
             m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Purchase);
         }},
-        {"F10: Other", [this]() {}},
+        {"F10: Other", [this]() { onOpenGoToDialog(); }},
         {"F12: Configure", [this]() {
             QMessageBox::information(this, "F12: Configure", "TallyPrime Configuration Settings Dialog");
         }}
@@ -224,6 +244,23 @@ void MainWindow::setupBottomBar() {
     layout->addWidget(verLabel);
 }
 
+void MainWindow::switchActiveCompany(const std::string& companyId) {
+    m_currentCompanyId = companyId;
+    auto comp = m_companyService->getCompany(companyId);
+    if (comp) {
+        m_topCompanyLabel->setText(QString::fromStdString(comp->name + " (2026-2027)"));
+    }
+
+    m_gatewayView->refreshCompanyInfo(m_currentCompanyId);
+    m_voucherEntryView->setCompanyId(m_currentCompanyId);
+    m_dayBookView->setCompanyId(m_currentCompanyId);
+    m_trialBalanceView->setCompanyId(m_currentCompanyId);
+    m_profitLossView->setCompanyId(m_currentCompanyId);
+    m_balanceSheetView->setCompanyId(m_currentCompanyId);
+    m_ledgerStatementView->setCompanyId(m_currentCompanyId);
+    m_groupSummaryView->setCompanyId(m_currentCompanyId);
+}
+
 void MainWindow::onScreenChanged(application::ScreenId newScreen, const std::string& param) {
     switch (newScreen) {
         case application::ScreenId::Gateway:
@@ -239,28 +276,40 @@ void MainWindow::onScreenChanged(application::ScreenId newScreen, const std::str
         case application::ScreenId::DayBook:
             m_stackedWidget->setCurrentIndex(2);
             m_dayBookView->setCompanyId(m_currentCompanyId);
-            m_bottomStatusLabel->setText("Day Book | Esc: Back to Gateway");
+            m_bottomStatusLabel->setText("Day Book | Esc: Back to Gateway | Double-click row for voucher details");
             break;
         case application::ScreenId::TrialBalance:
             m_stackedWidget->setCurrentIndex(3);
             m_trialBalanceView->setCompanyId(m_currentCompanyId);
-            m_bottomStatusLabel->setText("Trial Balance | Esc: Back to Gateway");
+            m_bottomStatusLabel->setText("Trial Balance | Esc: Back to Gateway | Double-click ledger for statement");
             break;
         case application::ScreenId::ProfitLoss:
             m_stackedWidget->setCurrentIndex(4);
             m_profitLossView->setCompanyId(m_currentCompanyId);
-            m_bottomStatusLabel->setText("Profit & Loss A/c | Esc: Back to Gateway");
+            m_bottomStatusLabel->setText("Profit & Loss A/c | Esc: Back to Gateway | Double-click ledger for statement");
             break;
         case application::ScreenId::BalanceSheet:
             m_stackedWidget->setCurrentIndex(5);
             m_balanceSheetView->setCompanyId(m_currentCompanyId);
-            m_bottomStatusLabel->setText("Balance Sheet | Esc: Back to Gateway");
+            m_bottomStatusLabel->setText("Balance Sheet | Esc: Back to Gateway | Double-click ledger for statement");
             break;
         case application::ScreenId::LedgerStatement:
             m_stackedWidget->setCurrentIndex(6);
             m_ledgerStatementView->setCompanyId(m_currentCompanyId);
             if (!param.empty()) m_ledgerStatementView->setLedgerId(param);
-            m_bottomStatusLabel->setText("Ledger Account Statement | Esc: Back to Gateway");
+            m_bottomStatusLabel->setText("Ledger Account Statement | Esc: Back to Gateway | Double-click row for voucher details");
+            break;
+        case application::ScreenId::GroupSummary:
+            m_stackedWidget->setCurrentIndex(7);
+            m_groupSummaryView->setCompanyId(m_currentCompanyId);
+            if (!param.empty()) m_groupSummaryView->setGroupId(param);
+            m_bottomStatusLabel->setText("Group Summary | Esc: Back to Gateway | Double-click row to drill down");
+            break;
+        case application::ScreenId::MasterCreation:
+            onMasterCreationClicked();
+            break;
+        case application::ScreenId::MasterAlteration:
+            onMasterAlterationClicked();
             break;
         default:
             m_stackedWidget->setCurrentIndex(0);
@@ -273,15 +322,104 @@ void MainWindow::onOpenGoToDialog() {
     dlg.exec();
 }
 
+void MainWindow::onCompanyClicked() {
+    CompanyDialog dlg(*m_companyService, m_currentCompanyId, this);
+    if (dlg.exec() == QDialog::Accepted && dlg.companyChanged()) {
+        switchActiveCompany(dlg.selectedCompanyId());
+    }
+}
+
+void MainWindow::onDateClicked() {
+    DateDialog dlg(m_currentDate, m_fromDate, m_toDate, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        m_currentDate = dlg.currentDate();
+        m_fromDate = dlg.fromDate();
+        m_toDate = dlg.toDate();
+
+        auto comp = m_companyService->getCompany(m_currentCompanyId);
+        if (comp) {
+            m_topCompanyLabel->setText(QString::fromStdString(comp->name + " (" + m_fromDate + " to " + m_toDate + ")"));
+        }
+
+        m_gatewayView->refreshCompanyInfo(m_currentCompanyId);
+        m_trialBalanceView->refreshData();
+        m_profitLossView->refreshData();
+        m_balanceSheetView->refreshData();
+        m_dayBookView->refreshData();
+        m_ledgerStatementView->refreshData();
+        m_groupSummaryView->refreshData();
+    }
+}
+
+void MainWindow::onBackupRestoreClicked() {
+    BackupRestoreDialog dlg(*m_dbManager, this);
+    if (dlg.exec() == QDialog::Accepted && dlg.databaseRestored()) {
+        auto list = m_companyService->listCompanies();
+        if (!list.empty()) {
+            switchActiveCompany(list[0].id);
+        }
+    }
+}
+
+void MainWindow::onExchangeClicked() {
+    ExchangeDialog dlg(m_currentCompanyId, *m_dbManager, this);
+    dlg.exec();
+}
+
+void MainWindow::onImportClicked() {
+    ImportDialog dlg(m_currentCompanyId, *m_dbManager, this);
+    if (dlg.exec() == QDialog::Accepted && dlg.dataImported()) {
+        switchActiveCompany(m_currentCompanyId);
+    }
+}
+
+void MainWindow::onExportClicked() {
+    ExportDialog dlg(m_currentCompanyId, *m_dbManager, this);
+    dlg.exec();
+}
+
+void MainWindow::onMasterCreationClicked() {
+    MasterSelectionDialog dlg(MasterMode::Create, m_currentCompanyId, *m_companyService, *m_groupService, *m_ledgerService, this);
+    dlg.exec();
+    m_navManager.navigateTo(application::ScreenId::Gateway);
+}
+
+void MainWindow::onMasterAlterationClicked() {
+    MasterSelectionDialog dlg(MasterMode::Alter, m_currentCompanyId, *m_companyService, *m_groupService, *m_ledgerService, this);
+    dlg.exec();
+    m_navManager.navigateTo(application::ScreenId::Gateway);
+}
+
 void MainWindow::keyPressEvent(QKeyEvent* event) {
     if (event->modifiers() & Qt::AltModifier) {
         if (event->key() == Qt::Key_G) {
             onOpenGoToDialog();
             return;
+        } else if (event->key() == Qt::Key_K) {
+            onCompanyClicked();
+            return;
+        } else if (event->key() == Qt::Key_Y) {
+            onBackupRestoreClicked();
+            return;
+        } else if (event->key() == Qt::Key_Z) {
+            onExchangeClicked();
+            return;
+        } else if (event->key() == Qt::Key_O) {
+            onImportClicked();
+            return;
+        } else if (event->key() == Qt::Key_E) {
+            onExportClicked();
+            return;
         }
     }
 
-    if (event->key() == Qt::Key_F1) {
+    if (event->key() == Qt::Key_F2) {
+        onDateClicked();
+        return;
+    } else if (event->key() == Qt::Key_F3) {
+        onCompanyClicked();
+        return;
+    } else if (event->key() == Qt::Key_F1) {
         QMessageBox::about(this, "About Antigravity Accounting",
             "<h3>Antigravity Accounting</h3>"
             "<p>A native C++20 and Qt 6 desktop accounting system inspired by TallyPrime.</p>"

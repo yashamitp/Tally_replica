@@ -1,3 +1,5 @@
+#include <QFile>
+#include <QFileInfo>
 #include "DatabaseManager.hpp"
 #include "migrations/SchemaMigrations.hpp"
 #include "../utilities/Logger.hpp"
@@ -67,6 +69,77 @@ bool DatabaseManager::commitTransaction() {
 
 bool DatabaseManager::rollbackTransaction() {
     return m_db.rollback();
+}
+
+bool DatabaseManager::backupTo(const std::string& destinationPath) {
+    if (!isOpen()) {
+        utilities::Logger::error("Cannot backup: database is not open");
+        return false;
+    }
+
+    QString dest = QString::fromStdString(destinationPath);
+    if (QFile::exists(dest)) {
+        QFile::remove(dest);
+    }
+
+    QSqlQuery q(m_db);
+    QString sql = QString("VACUUM INTO '%1'").arg(dest);
+    if (!q.exec(sql)) {
+        utilities::Logger::error("Backup failed: " + q.lastError().text().toStdString());
+        return false;
+    }
+
+    utilities::Logger::info("Database successfully backed up to: " + destinationPath);
+    return true;
+}
+
+bool DatabaseManager::restoreFrom(const std::string& sourcePath) {
+    QString src = QString::fromStdString(sourcePath);
+    if (!QFile::exists(src)) {
+        utilities::Logger::error("Restore failed: source file does not exist: " + sourcePath);
+        return false;
+    }
+
+    // Validate that the backup file is a valid SQLite database
+    {
+        QString testConnName = QString::fromStdString(m_connectionName) + "_RestoreCheck";
+        QSqlDatabase testDb = QSqlDatabase::addDatabase("QSQLITE", testConnName);
+        testDb.setDatabaseName(src);
+        if (!testDb.open()) {
+            utilities::Logger::error("Restore failed: unable to open source file as SQLite database: " + testDb.lastError().text().toStdString());
+            QSqlDatabase::removeDatabase(testConnName);
+            return false;
+        }
+
+        QSqlQuery checkQuery(testDb);
+        if (!checkQuery.exec("PRAGMA quick_check") || !checkQuery.next() || checkQuery.value(0).toString() != "ok") {
+            utilities::Logger::error("Restore failed: source database failed integrity check");
+            testDb.close();
+            QSqlDatabase::removeDatabase(testConnName);
+            return false;
+        }
+        testDb.close();
+        QSqlDatabase::removeDatabase(testConnName);
+    }
+
+    std::string currentDbPath = m_dbPath;
+    close();
+
+    if (currentDbPath != ":memory:") {
+        QString currentTarget = QString::fromStdString(currentDbPath);
+        if (QFile::exists(currentTarget)) {
+            QFile::remove(currentTarget);
+        }
+        if (!QFile::copy(src, currentTarget)) {
+            utilities::Logger::error("Restore failed: unable to copy backup file over current database");
+            open(currentDbPath);
+            return false;
+        }
+        return open(currentDbPath);
+    } else {
+        // If in-memory, reopen with the source path directly
+        return open(sourcePath);
+    }
 }
 
 std::string DatabaseManager::lastError() const {

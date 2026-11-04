@@ -341,6 +341,64 @@ std::optional<domain::Company> CompanyService::getCompany(const std::string& id)
     return std::nullopt;
 }
 
+bool CompanyService::alterCompany(const domain::Company& company) {
+    if (company.name.empty()) {
+        throw std::invalid_argument("Company name cannot be empty");
+    }
+
+    std::string now = utilities::DateUtils::currentIsoDateTime();
+    QSqlQuery query(m_dbManager.database());
+    query.prepare(R"(
+        UPDATE companies SET
+            name = :name,
+            formal_name = :formal_name,
+            address_line1 = :address_line1,
+            address_line2 = :address_line2,
+            city = :city,
+            state = :state,
+            country = :country,
+            pincode = :pincode,
+            gstin = :gstin,
+            pan = :pan,
+            currency_symbol = :currency_symbol,
+            currency_formal_name = :currency_formal_name,
+            decimal_places = :decimal_places,
+            updated_at = :updated_at
+        WHERE id = :id
+    )");
+
+    query.bindValue(":name", QString::fromStdString(company.name));
+    query.bindValue(":formal_name", company.formalName ? QString::fromStdString(*company.formalName) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":address_line1", company.addressLine1 ? QString::fromStdString(*company.addressLine1) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":address_line2", company.addressLine2 ? QString::fromStdString(*company.addressLine2) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":city", company.city ? QString::fromStdString(*company.city) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":state", company.state ? QString::fromStdString(*company.state) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":country", QString::fromStdString(company.country));
+    query.bindValue(":pincode", company.pincode ? QString::fromStdString(*company.pincode) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":gstin", company.gstin ? QString::fromStdString(*company.gstin) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":pan", company.pan ? QString::fromStdString(*company.pan) : QVariant(QMetaType(QMetaType::QString)));
+    query.bindValue(":currency_symbol", QString::fromStdString(company.currencySymbol));
+    query.bindValue(":currency_formal_name", QString::fromStdString(company.currencyFormalName));
+    query.bindValue(":decimal_places", company.decimalPlaces);
+    query.bindValue(":updated_at", QString::fromStdString(now));
+    query.bindValue(":id", QString::fromStdString(company.id));
+
+    return query.exec() && query.numRowsAffected() > 0;
+}
+
+bool CompanyService::deleteCompany(const std::string& id) {
+    m_dbManager.beginTransaction();
+    QSqlQuery q(m_dbManager.database());
+    q.prepare("DELETE FROM companies WHERE id = :id");
+    q.bindValue(":id", QString::fromStdString(id));
+    if (q.exec()) {
+        m_dbManager.commitTransaction();
+        return true;
+    }
+    m_dbManager.rollbackTransaction();
+    return false;
+}
+
 std::vector<domain::AccountingGroup> CompanyService::listGroups(const std::string& companyId) {
     std::vector<domain::AccountingGroup> result;
     QSqlQuery query(m_dbManager.database());

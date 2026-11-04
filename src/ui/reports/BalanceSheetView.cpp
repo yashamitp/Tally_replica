@@ -62,6 +62,18 @@ void BalanceSheetView::setupUi() {
     m_assetsTree->setColumnWidth(1, 140);
     splitLayout->addWidget(m_assetsTree);
 
+    auto handleTreeClick = [this](QTreeWidgetItem* item, int) {
+        if (!item) return;
+        QString lid = item->data(0, Qt::UserRole).toString();
+        if (!lid.isEmpty()) {
+            m_navManager.navigateTo(application::ScreenId::LedgerStatement, lid.toStdString());
+        } else if (item->data(0, Qt::UserRole + 1).toInt() == 999) {
+            m_navManager.navigateTo(application::ScreenId::ProfitLoss);
+        }
+    };
+    connect(m_liabilitiesTree, &QTreeWidget::itemDoubleClicked, handleTreeClick);
+    connect(m_assetsTree, &QTreeWidget::itemDoubleClicked, handleTreeClick);
+
     mainLayout->addLayout(splitLayout);
 
     // Bottom Summary
@@ -119,6 +131,7 @@ void BalanceSheetView::refreshData() {
         for (const auto& l : sec.ledgers) {
             QTreeWidgetItem* li = new QTreeWidgetItem(capRoot);
             li->setText(0, QString::fromStdString("   " + l.ledgerName));
+            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
             li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
             li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         }
@@ -127,6 +140,7 @@ void BalanceSheetView::refreshData() {
     // Profit & Loss Current Period
     QTreeWidgetItem* pnlItem = new QTreeWidgetItem(m_liabilitiesTree);
     pnlItem->setText(0, report.equity.isCurrentPeriodProfit ? "Profit & Loss A/c (Current Period Net Profit)" : "Profit & Loss A/c (Current Period Net Loss)");
+    pnlItem->setData(0, Qt::UserRole + 1, 999);
     pnlItem->setText(1, QString::fromStdString(report.equity.currentPeriodProfitOrLoss.formatInr(false)));
     pnlItem->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     pnlItem->setFont(0, bf);
@@ -142,6 +156,7 @@ void BalanceSheetView::refreshData() {
         for (const auto& l : sec.ledgers) {
             QTreeWidgetItem* li = new QTreeWidgetItem(secItem);
             li->setText(0, QString::fromStdString("   " + l.ledgerName));
+            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
             li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
             li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         }
@@ -160,6 +175,7 @@ void BalanceSheetView::refreshData() {
         for (const auto& l : sec.ledgers) {
             QTreeWidgetItem* li = new QTreeWidgetItem(secItem);
             li->setText(0, QString::fromStdString("   " + l.ledgerName));
+            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
             li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
             li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
         }

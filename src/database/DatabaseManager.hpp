@@ -24,6 +24,10 @@ public:
     bool commitTransaction();
     bool rollbackTransaction();
 
+    bool backupTo(const std::string& destinationPath);
+    bool restoreFrom(const std::string& sourcePath);
+
+    std::string dbPath() const { return m_dbPath; }
     std::string lastError() const;
 
 private:

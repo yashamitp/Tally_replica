@@ -7,6 +7,8 @@
 #include <QPushButton>
 #include "../../application/NavigationManager.hpp"
 #include "../../services/DayBookService.hpp"
+#include "../../services/VoucherService.hpp"
+#include "../../services/LedgerService.hpp"
 
 namespace tally::ui {
 
@@ -17,6 +19,8 @@ public:
     DayBookView(
         application::NavigationManager& navManager,
         services::DayBookService& dayBookService,
+        services::VoucherService& voucherService,
+        services::LedgerService& ledgerService,
         QWidget* parent = nullptr
     );
 
@@ -26,11 +30,16 @@ public:
 protected:
     void keyPressEvent(QKeyEvent* event) override;
 
+private slots:
+    void onRowDoubleClicked(int row, int column);
+
 private:
     void setupUi();
 
     application::NavigationManager& m_navManager;
     services::DayBookService& m_dayBookService;
+    services::VoucherService& m_voucherService;
+    services::LedgerService& m_ledgerService;
     std::string m_companyId;
 
     QLineEdit* m_fromDateEdit;

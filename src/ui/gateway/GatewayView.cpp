@@ -120,6 +120,7 @@ void GatewayView::populateMenu() {
         {"Profit & Loss A/c", application::ScreenId::ProfitLoss, false, 'P'},
         {"Trial Balance", application::ScreenId::TrialBalance, false, 'T'},
         {"Ledger Statement", application::ScreenId::LedgerStatement, false, 'L'},
+        {"Group Summary", application::ScreenId::GroupSummary, false, 'G'},
         {"Quit", application::ScreenId::Gateway, false, 'Q'}
     };
 
