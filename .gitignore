@@ -49,8 +49,10 @@ import_*.json
 .DS_Store
 Thumbs.db
 
-# Reference screenshots and local captures
+# Reference captures
 referenceimages/
-*.png
 *.jpg
 *.jpeg
+*.png
+!screenshots/*.png
+!screenshot/*.png

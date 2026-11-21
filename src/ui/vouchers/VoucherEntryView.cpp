@@ -81,10 +81,6 @@ void VoucherEntryView::setupUi() {
 
     mainLayout->addWidget(m_table);
 
-    // Initialize with 2 standard rows
-    addRow("Dr");
-    addRow("Cr");
-
     // 3. Narration Bar & Row Management
     QHBoxLayout* nLayout = new QHBoxLayout();
     QLabel* narLabel = new QLabel("Narration:", this);
@@ -137,6 +133,10 @@ void VoucherEntryView::setupUi() {
     mainLayout->addWidget(footerFrame);
 
     connect(m_table, &QTableWidget::cellChanged, this, &VoucherEntryView::onCellChanged);
+
+    // Initialize with 2 standard rows now that all UI elements are created
+    addRow("Dr");
+    addRow("Cr");
 }
 
 void VoucherEntryView::updateDayName() {
@@ -286,6 +286,8 @@ void VoucherEntryView::onCellChanged(int row, int column) {
 }
 
 void VoucherEntryView::updateTotals() {
+    if (!m_totalDebitLabel || !m_totalCreditLabel || !m_balanceStatusLabel) return;
+
     domain::ExactDecimal sumDr = domain::ExactDecimal::zero();
     domain::ExactDecimal sumCr = domain::ExactDecimal::zero();
 

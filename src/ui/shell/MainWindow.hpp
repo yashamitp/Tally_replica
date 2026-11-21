@@ -33,6 +33,12 @@ public:
 
     bool initialize(const std::string& dbPath = ":memory:");
     void switchActiveCompany(const std::string& companyId);
+    void navigateToScreen(application::ScreenId screen, const std::string& param = "");
+
+    services::CompanyService* companyService() const { return m_companyService.get(); }
+    services::LedgerService* ledgerService() const { return m_ledgerService.get(); }
+    services::VoucherService* voucherService() const { return m_voucherService.get(); }
+    services::GroupService* groupService() const { return m_groupService.get(); }
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;

@@ -16,6 +16,26 @@ A native, high-performance, keyboard-driven desktop accounting application inspi
 
 ---
 
+## Screenshots
+
+| Gateway of Tally | Accounting Voucher Creation |
+| :---: | :---: |
+| ![Gateway of Tally](screenshot/01_gateway_of_tally.png) | ![Voucher Creation](screenshot/02_accounting_voucher_entry.png) |
+
+| Day Book | Trial Balance |
+| :---: | :---: |
+| ![Day Book](screenshot/03_day_book.png) | ![Trial Balance](screenshot/04_trial_balance.png) |
+
+| Profit & Loss Statement | Balance Sheet |
+| :---: | :---: |
+| ![Profit & Loss](screenshot/05_profit_and_loss.png) | ![Balance Sheet](screenshot/06_balance_sheet.png) |
+
+| Group Summary Report |
+| :---: |
+| ![Group Summary](screenshot/07_group_summary.png) |
+
+---
+
 ## Architecture Overview
 
 ```

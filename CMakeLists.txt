@@ -130,6 +130,9 @@ add_executable(test_e2e_workflows tests/integration/test_e2e_workflows.cpp)
 target_link_libraries(test_e2e_workflows PRIVATE TallyCore)
 add_test(NAME test_e2e_workflows COMMAND test_e2e_workflows)
 
+add_executable(capture_screenshots tools/capture_screenshots.cpp)
+target_link_libraries(capture_screenshots PRIVATE TallyUI TallyCore Qt6::Widgets)
+
 # CPack Packaging Configuration
 install(TARGETS TallyReplica DESTINATION bin)
 set(CPACK_PACKAGE_NAME "TallyReplica")

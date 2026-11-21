@@ -270,6 +270,10 @@ void MainWindow::switchActiveCompany(const std::string& companyId) {
     m_groupSummaryView->setCompanyId(m_currentCompanyId);
 }
 
+void MainWindow::navigateToScreen(application::ScreenId screen, const std::string& param) {
+    onScreenChanged(screen, param);
+}
+
 void MainWindow::onScreenChanged(application::ScreenId newScreen, const std::string& param) {
     switch (newScreen) {
         case application::ScreenId::Gateway:
