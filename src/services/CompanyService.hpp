@@ -39,6 +39,7 @@ public:
     bool deleteCompany(const std::string& id);
     std::vector<domain::AccountingGroup> listGroups(const std::string& companyId);
     std::vector<domain::VoucherType> listVoucherTypes(const std::string& companyId);
+    database::DatabaseManager& dbManager() { return m_dbManager; }
 
 private:
     database::DatabaseManager& m_dbManager;

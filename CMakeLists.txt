@@ -126,6 +126,10 @@ add_executable(test_backup_restore tests/unit/test_backup_restore.cpp)
 target_link_libraries(test_backup_restore PRIVATE TallyCore)
 add_test(NAME test_backup_restore COMMAND test_backup_restore)
 
+add_executable(test_e2e_workflows tests/integration/test_e2e_workflows.cpp)
+target_link_libraries(test_e2e_workflows PRIVATE TallyCore)
+add_test(NAME test_e2e_workflows COMMAND test_e2e_workflows)
+
 # CPack Packaging Configuration
 install(TARGETS TallyReplica DESTINATION bin)
 set(CPACK_PACKAGE_NAME "TallyReplica")

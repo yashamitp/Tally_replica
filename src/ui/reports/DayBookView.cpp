@@ -126,11 +126,22 @@ void DayBookView::refreshData() {
         m_table->setItem(r, 2, new QTableWidgetItem(QString::fromStdString(item.voucherTypeName)));
         m_table->setItem(r, 3, new QTableWidgetItem(QString::fromStdString(item.voucherNumber)));
 
-        auto* dItem = new QTableWidgetItem(QString::fromStdString(item.totalAmount.formatInr(false)));
+        QString drText = "";
+        QString crText = "";
+        if (item.voucherCategory == domain::VoucherCategory::Payment || item.voucherCategory == domain::VoucherCategory::Purchase) {
+            drText = QString::fromStdString(item.totalAmount.formatInr(false));
+        } else if (item.voucherCategory == domain::VoucherCategory::Receipt || item.voucherCategory == domain::VoucherCategory::Sales) {
+            crText = QString::fromStdString(item.totalAmount.formatInr(false));
+        } else {
+            drText = QString::fromStdString(item.totalAmount.formatInr(false));
+            crText = QString::fromStdString(item.totalAmount.formatInr(false));
+        }
+
+        auto* dItem = new QTableWidgetItem(drText);
         dItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_table->setItem(r, 4, dItem);
 
-        auto* cItem = new QTableWidgetItem(QString::fromStdString(item.totalAmount.formatInr(false)));
+        auto* cItem = new QTableWidgetItem(crText);
         cItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_table->setItem(r, 5, cItem);
     }

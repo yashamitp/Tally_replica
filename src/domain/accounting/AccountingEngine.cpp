@@ -605,4 +605,16 @@ std::optional<Voucher> AccountingEngine::getVoucherWithEntries(const std::string
     return v;
 }
 
+std::string AccountingEngine::getNextVoucherNumber(const std::string& companyId, const std::string& voucherTypeId) {
+    QSqlQuery q(m_dbManager.database());
+    q.prepare("SELECT MAX(CAST(voucher_number AS INTEGER)) FROM vouchers WHERE company_id = :cid AND voucher_type_id = :vtid");
+    q.bindValue(":cid", QString::fromStdString(companyId));
+    q.bindValue(":vtid", QString::fromStdString(voucherTypeId));
+    int maxNo = 0;
+    if (q.exec() && q.next() && !q.value(0).isNull()) {
+        maxNo = q.value(0).toInt();
+    }
+    return std::to_string(maxNo + 1);
+}
+
 } // namespace tally::domain

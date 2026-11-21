@@ -50,7 +50,12 @@ bool MainWindow::initialize(const std::string& dbPath) {
         auto comp = m_companyService->createCompany(cp);
         m_currentCompanyId = comp.id;
     } else {
-        m_currentCompanyId = companies[0].id;
+        auto lastActive = m_dbManager->getSetting("last_active_company_id");
+        if (lastActive.has_value() && m_companyService->getCompany(*lastActive).has_value()) {
+            m_currentCompanyId = *lastActive;
+        } else {
+            m_currentCompanyId = companies[0].id;
+        }
     }
 
     setupUi();
@@ -187,6 +192,7 @@ void MainWindow::setupRightSidebar() {
     const std::vector<FKeyDef> buttons = {
         {"F2: Date", [this]() { onDateClicked(); }},
         {"F3: Company", [this]() { onCompanyClicked(); }},
+        {"Alt+F1: Shut", [this]() { onShutCompany(); }},
         {"F4: Contra", [this]() {
             m_navManager.navigateTo(application::ScreenId::VoucherEntry);
             m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Contra);
@@ -246,6 +252,9 @@ void MainWindow::setupBottomBar() {
 
 void MainWindow::switchActiveCompany(const std::string& companyId) {
     m_currentCompanyId = companyId;
+    if (m_dbManager) {
+        m_dbManager->setSetting("last_active_company_id", companyId);
+    }
     auto comp = m_companyService->getCompany(companyId);
     if (comp) {
         m_topCompanyLabel->setText(QString::fromStdString(comp->name + " (2026-2027)"));
@@ -390,6 +399,39 @@ void MainWindow::onMasterAlterationClicked() {
     m_navManager.navigateTo(application::ScreenId::Gateway);
 }
 
+void MainWindow::onShutCompany() {
+    auto comp = m_companyService->getCompany(m_currentCompanyId);
+    QString cname = comp ? QString::fromStdString(comp->name) : "Current Company";
+    auto reply = QMessageBox::question(this, "Shut Company",
+        QString("Are you sure you want to shut company '%1'?").arg(cname),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (reply != QMessageBox::Yes) return;
+
+    auto all = m_companyService->listCompanies();
+    std::string nextCompanyId = "";
+    for (const auto& c : all) {
+        if (c.id != m_currentCompanyId) {
+            nextCompanyId = c.id;
+            break;
+        }
+    }
+
+    if (!nextCompanyId.empty()) {
+        switchActiveCompany(nextCompanyId);
+        m_navManager.navigateTo(application::ScreenId::Gateway);
+        QMessageBox::information(this, "Company Shut",
+            QString("Company '%1' shut successfully. Switched to '%2'.")
+                .arg(cname)
+                .arg(QString::fromStdString(m_companyService->getCompany(nextCompanyId)->name)));
+    } else {
+        CompanyDialog dlg(*m_companyService, m_currentCompanyId, this);
+        if (dlg.exec() == QDialog::Accepted && dlg.companyChanged()) {
+            switchActiveCompany(dlg.selectedCompanyId());
+            m_navManager.navigateTo(application::ScreenId::Gateway);
+        }
+    }
+}
+
 void MainWindow::keyPressEvent(QKeyEvent* event) {
     if (event->modifiers() & Qt::AltModifier) {
         if (event->key() == Qt::Key_G) {
@@ -410,6 +452,12 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
         } else if (event->key() == Qt::Key_E) {
             onExportClicked();
             return;
+        } else if (event->key() == Qt::Key_F1) {
+            onShutCompany();
+            return;
+        } else if (event->key() == Qt::Key_F2) {
+            onDateClicked();
+            return;
         }
     }
 
@@ -418,6 +466,33 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
         return;
     } else if (event->key() == Qt::Key_F3) {
         onCompanyClicked();
+        return;
+    } else if (event->key() == Qt::Key_F4) {
+        m_navManager.navigateTo(application::ScreenId::VoucherEntry);
+        m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Contra);
+        return;
+    } else if (event->key() == Qt::Key_F5) {
+        m_navManager.navigateTo(application::ScreenId::VoucherEntry);
+        m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Payment);
+        return;
+    } else if (event->key() == Qt::Key_F6) {
+        m_navManager.navigateTo(application::ScreenId::VoucherEntry);
+        m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Receipt);
+        return;
+    } else if (event->key() == Qt::Key_F7) {
+        m_navManager.navigateTo(application::ScreenId::VoucherEntry);
+        m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Journal);
+        return;
+    } else if (event->key() == Qt::Key_F8) {
+        m_navManager.navigateTo(application::ScreenId::VoucherEntry);
+        m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Sales);
+        return;
+    } else if (event->key() == Qt::Key_F9) {
+        m_navManager.navigateTo(application::ScreenId::VoucherEntry);
+        m_voucherEntryView->setVoucherCategory(domain::VoucherCategory::Purchase);
+        return;
+    } else if (event->key() == Qt::Key_F10) {
+        onOpenGoToDialog();
         return;
     } else if (event->key() == Qt::Key_F1) {
         QMessageBox::about(this, "About Antigravity Accounting",

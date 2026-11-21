@@ -32,8 +32,11 @@ GoToDialog::GoToDialog(application::NavigationManager& navManager, QWidget* pare
         {"Trial Balance", application::ScreenId::TrialBalance, "Reports"},
         {"Profit & Loss A/c", application::ScreenId::ProfitLoss, "Reports"},
         {"Balance Sheet", application::ScreenId::BalanceSheet, "Reports"},
+        {"Cash Book / Bank Book", application::ScreenId::LedgerStatement, "Reports"},
         {"Ledger Statement / Account Books", application::ScreenId::LedgerStatement, "Reports"},
-        {"Group Summary", application::ScreenId::GroupSummary, "Reports"}
+        {"Group Summary", application::ScreenId::GroupSummary, "Reports"},
+        {"Master Creation (Groups & Ledgers)", application::ScreenId::MasterCreation, "Masters"},
+        {"Master Alteration", application::ScreenId::MasterAlteration, "Masters"}
     };
 
     onFilterChanged("");

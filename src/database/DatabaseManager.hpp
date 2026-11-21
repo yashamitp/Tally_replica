@@ -27,6 +27,9 @@ public:
     bool backupTo(const std::string& destinationPath);
     bool restoreFrom(const std::string& sourcePath);
 
+    bool setSetting(const std::string& key, const std::string& value);
+    std::optional<std::string> getSetting(const std::string& key);
+
     std::string dbPath() const { return m_dbPath; }
     std::string lastError() const;
 

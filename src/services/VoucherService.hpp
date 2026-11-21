@@ -17,6 +17,7 @@ public:
     domain::Voucher reverseVoucher(const domain::ReverseVoucherParams& params);
     bool cancelVoucher(const std::string& companyId, const std::string& voucherId, const std::string& reason);
     std::optional<domain::Voucher> getVoucher(const std::string& voucherId);
+    std::string getNextVoucherNumber(const std::string& companyId, const std::string& voucherTypeId);
 
 private:
     domain::AccountingEngine m_engine;

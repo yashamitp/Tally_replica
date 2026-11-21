@@ -142,6 +142,26 @@ bool DatabaseManager::restoreFrom(const std::string& sourcePath) {
     }
 }
 
+bool DatabaseManager::setSetting(const std::string& key, const std::string& value) {
+    if (!isOpen()) return false;
+    QSqlQuery q(m_db);
+    q.prepare("INSERT INTO app_settings (key, value) VALUES (:k, :v) ON CONFLICT(key) DO UPDATE SET value = :v");
+    q.bindValue(":k", QString::fromStdString(key));
+    q.bindValue(":v", QString::fromStdString(value));
+    return q.exec();
+}
+
+std::optional<std::string> DatabaseManager::getSetting(const std::string& key) {
+    if (!isOpen()) return std::nullopt;
+    QSqlQuery q(m_db);
+    q.prepare("SELECT value FROM app_settings WHERE key = :k");
+    q.bindValue(":k", QString::fromStdString(key));
+    if (q.exec() && q.next()) {
+        return q.value(0).toString().toStdString();
+    }
+    return std::nullopt;
+}
+
 std::string DatabaseManager::lastError() const {
     return m_db.lastError().text().toStdString();
 }

@@ -21,4 +21,8 @@ std::optional<domain::Voucher> VoucherService::getVoucher(const std::string& vou
     return m_engine.getVoucherWithEntries(voucherId);
 }
 
+std::string VoucherService::getNextVoucherNumber(const std::string& companyId, const std::string& voucherTypeId) {
+    return m_engine.getNextVoucherNumber(companyId, voucherTypeId);
+}
+
 } // namespace tally::services

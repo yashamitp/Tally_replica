@@ -24,6 +24,7 @@ public:
     Voucher reverseVoucher(const ReverseVoucherParams& params);
     bool cancelVoucher(const std::string& companyId, const std::string& voucherId, const std::string& reason);
     std::optional<Voucher> getVoucherWithEntries(const std::string& voucherId);
+    std::string getNextVoucherNumber(const std::string& companyId, const std::string& voucherTypeId);
 
 private:
     database::DatabaseManager& m_dbManager;

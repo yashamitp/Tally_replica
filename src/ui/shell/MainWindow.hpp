@@ -48,6 +48,7 @@ private slots:
     void onExportClicked();
     void onMasterCreationClicked();
     void onMasterAlterationClicked();
+    void onShutCompany();
 
 private:
     void setupUi();

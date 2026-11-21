@@ -29,6 +29,8 @@ private slots:
     void onSelectCompany();
     void onCreateCompany();
     void onAlterCompany();
+    void onShutCompany();
+    void onDeleteCompany();
     void refreshCompanyList();
 
 private:
@@ -46,6 +48,8 @@ private:
     // Select Tab
     QListWidget* m_companyListWidget = nullptr;
     QPushButton* m_selectBtn = nullptr;
+    QPushButton* m_shutBtn = nullptr;
+    QPushButton* m_deleteBtn = nullptr;
 
     // Create Tab
     QLineEdit* m_createNameEdit = nullptr;
@@ -57,6 +61,10 @@ private:
     QLineEdit* m_createGstinEdit = nullptr;
     QLineEdit* m_createPanEdit = nullptr;
     QLineEdit* m_createFyStartEdit = nullptr;
+    QLineEdit* m_createBooksBeginningEdit = nullptr;
+    QLineEdit* m_createCurrencySymbolEdit = nullptr;
+    QLineEdit* m_createCurrencyFormalEdit = nullptr;
+    QLineEdit* m_createDecimalPlacesEdit = nullptr;
 
     // Alter Tab
     QLineEdit* m_alterNameEdit = nullptr;

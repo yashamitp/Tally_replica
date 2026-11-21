@@ -34,11 +34,17 @@ private slots:
     void onCellChanged(int row, int column);
     void onPostVoucher();
     void onCategoryButtonClicked(domain::VoucherCategory category);
+    void onAddRowClicked();
 
 private:
     void setupUi();
     void updateTotals();
     void loadLedgers();
+    void addRow(const QString& defaultSide = "Dr");
+    void updateVoucherTypeId();
+    void updateNextVoucherNumber();
+    void onRowSideChanged(int row, const QString& side);
+    void updateDayName();
 
     application::NavigationManager& m_navManager;
     services::CompanyService& m_companyService;

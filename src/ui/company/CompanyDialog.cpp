@@ -43,6 +43,17 @@ void CompanyDialog::setupSelectTab() {
     layout->addWidget(m_companyListWidget);
 
     QHBoxLayout* btnLayout = new QHBoxLayout();
+
+    m_shutBtn = new QPushButton("Shut Company", tab);
+    m_shutBtn->setStyleSheet("background-color: #D35400; color: white; font-weight: bold; padding: 6px 14px;");
+    connect(m_shutBtn, &QPushButton::clicked, this, &CompanyDialog::onShutCompany);
+    btnLayout->addWidget(m_shutBtn);
+
+    m_deleteBtn = new QPushButton("Delete Company", tab);
+    m_deleteBtn->setStyleSheet("background-color: #C0392B; color: white; font-weight: bold; padding: 6px 14px;");
+    connect(m_deleteBtn, &QPushButton::clicked, this, &CompanyDialog::onDeleteCompany);
+    btnLayout->addWidget(m_deleteBtn);
+
     btnLayout->addStretch();
 
     m_selectBtn = new QPushButton("Select Company (Enter)", tab);
@@ -90,6 +101,18 @@ void CompanyDialog::setupCreateTab() {
 
     m_createFyStartEdit = new QLineEdit("2026-04-01", tab);
     form->addRow("Financial Year Begins From:", m_createFyStartEdit);
+
+    m_createBooksBeginningEdit = new QLineEdit("2026-04-01", tab);
+    form->addRow("Books Beginning From:", m_createBooksBeginningEdit);
+
+    m_createCurrencySymbolEdit = new QLineEdit("₹", tab);
+    form->addRow("Currency Symbol:", m_createCurrencySymbolEdit);
+
+    m_createCurrencyFormalEdit = new QLineEdit("INR", tab);
+    form->addRow("Currency Formal Name:", m_createCurrencyFormalEdit);
+
+    m_createDecimalPlacesEdit = new QLineEdit("2", tab);
+    form->addRow("Decimal Places:", m_createDecimalPlacesEdit);
 
     layout->addLayout(form);
     layout->addStretch();
@@ -207,7 +230,13 @@ void CompanyDialog::onCreateCompany() {
         if (!m_createGstinEdit->text().trimmed().isEmpty()) cp.gstin = m_createGstinEdit->text().trimmed().toStdString();
         if (!m_createPanEdit->text().trimmed().isEmpty()) cp.pan = m_createPanEdit->text().trimmed().toStdString();
         cp.financialYearStart = m_createFyStartEdit->text().trimmed().toStdString();
-        cp.booksBeginningFrom = cp.financialYearStart;
+        cp.booksBeginningFrom = m_createBooksBeginningEdit->text().trimmed().toStdString();
+        if (cp.booksBeginningFrom.empty()) cp.booksBeginningFrom = cp.financialYearStart;
+        if (!m_createCurrencySymbolEdit->text().trimmed().isEmpty()) cp.currencySymbol = m_createCurrencySymbolEdit->text().trimmed().toStdString();
+        if (!m_createCurrencyFormalEdit->text().trimmed().isEmpty()) cp.currencyFormalName = m_createCurrencyFormalEdit->text().trimmed().toStdString();
+        try {
+            cp.decimalPlaces = std::stoi(m_createDecimalPlacesEdit->text().trimmed().toStdString());
+        } catch (...) { cp.decimalPlaces = 2; }
 
         auto comp = m_companyService.createCompany(cp);
         m_selectedCompanyId = comp.id;
@@ -251,6 +280,65 @@ void CompanyDialog::onAlterCompany() {
         }
     } catch (const std::exception& ex) {
         QMessageBox::critical(this, "Error", QString::fromStdString(ex.what()));
+    }
+}
+
+void CompanyDialog::onShutCompany() {
+    auto* item = m_companyListWidget->currentItem();
+    if (!item) return;
+    std::string cid = item->data(Qt::UserRole).toString().toStdString();
+    auto comp = m_companyService.getCompany(cid);
+    QString cname = comp ? QString::fromStdString(comp->name) : "Company";
+
+    auto reply = QMessageBox::question(this, "Shut Company",
+        QString("Are you sure you want to shut '%1'?").arg(cname),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (reply != QMessageBox::Yes) return;
+
+    auto all = m_companyService.listCompanies();
+    std::string nextId = "";
+    for (const auto& c : all) {
+        if (c.id != cid) {
+            nextId = c.id;
+            break;
+        }
+    }
+    if (!nextId.empty()) {
+        m_selectedCompanyId = nextId;
+        m_companyChanged = true;
+        QMessageBox::information(this, "Company Shut",
+            QString("'%1' shut. Switched active company to '%2'.")
+                .arg(cname)
+                .arg(QString::fromStdString(m_companyService.getCompany(nextId)->name)));
+        accept();
+    } else {
+        QMessageBox::warning(this, "Cannot Shut Only Company",
+            "This is the only open company. Please create another company first before shutting this one.");
+    }
+}
+
+void CompanyDialog::onDeleteCompany() {
+    auto* item = m_companyListWidget->currentItem();
+    if (!item) return;
+    std::string cid = item->data(Qt::UserRole).toString().toStdString();
+    auto comp = m_companyService.getCompany(cid);
+    QString cname = comp ? QString::fromStdString(comp->name) : "Company";
+
+    auto reply = QMessageBox::warning(this, "Delete Company",
+        QString("WARNING: This will permanently delete company '%1' and ALL associated vouchers, ledgers, and data. Proceed?").arg(cname),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (reply != QMessageBox::Yes) return;
+
+    if (m_companyService.deleteCompany(cid)) {
+        QMessageBox::information(this, "Deleted", QString("Company '%1' was deleted.").arg(cname));
+        refreshCompanyList();
+        auto all = m_companyService.listCompanies();
+        if (!all.empty()) {
+            m_selectedCompanyId = all[0].id;
+            m_companyChanged = true;
+        }
+    } else {
+        QMessageBox::critical(this, "Error", "Failed to delete company.");
     }
 }
 
