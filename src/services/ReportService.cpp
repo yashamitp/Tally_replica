@@ -218,54 +218,68 @@ TrialBalanceReport ReportService::generateTrialBalance(
         totCloseCr = totCloseCr.add(closeCr);
     }
 
-    // Build hierarchical tree
-    std::map<std::string, TrialBalanceGroupNode> nodeMap;
+    // Build hierarchical tree bottom-up recursively to support arbitrary nesting
+    std::map<std::string, std::vector<std::string>> childGroupsMap;
+    std::vector<std::string> rootGroupIds;
+
     for (const auto& g : groupsList) {
+        if (g.parentId.has_value() && !g.parentId->empty() && groupMap.find(*g.parentId) != groupMap.end()) {
+            childGroupsMap[*g.parentId].push_back(g.id);
+        } else {
+            rootGroupIds.push_back(g.id);
+        }
+    }
+
+    std::function<TrialBalanceGroupNode(const std::string&)> buildNode =
+        [&](const std::string& gid) -> TrialBalanceGroupNode {
+        const auto& g = groupMap[gid];
         TrialBalanceGroupNode node;
         node.groupId = g.id;
         node.groupName = g.name;
         node.groupNature = g.nature;
         node.parentId = g.parentId;
         node.ledgers = ledgersByGroup[g.id];
-        nodeMap[g.id] = node;
-    }
 
-    std::vector<TrialBalanceGroupNode> rootNodes;
-    for (const auto& g : groupsList) {
-        if (g.parentId && nodeMap.find(*g.parentId) != nodeMap.end()) {
-            nodeMap[*g.parentId].subGroups.push_back(nodeMap[g.id]);
-        } else {
-            rootNodes.push_back(nodeMap[g.id]);
-        }
-    }
-
-    // Rollup helper
-    auto rollupNode = [](auto& self, TrialBalanceGroupNode& n) -> void {
         domain::ExactDecimal cDr = domain::ExactDecimal::zero();
         domain::ExactDecimal cCr = domain::ExactDecimal::zero();
 
-        for (const auto& l : n.ledgers) {
+        // 1. Direct leaf ledgers
+        for (const auto& l : node.ledgers) {
             cDr = cDr.add(l.closingDebit);
             cCr = cCr.add(l.closingCredit);
         }
-        for (auto& sg : n.subGroups) {
-            self(self, sg);
-            cDr = cDr.add(sg.closingDebit);
-            cCr = cCr.add(sg.closingCredit);
+
+        // 2. Child sub-groups recursively
+        auto it = childGroupsMap.find(g.id);
+        if (it != childGroupsMap.end()) {
+            for (const auto& childId : it->second) {
+                auto childNode = buildNode(childId);
+                cDr = cDr.add(childNode.closingDebit);
+                cCr = cCr.add(childNode.closingCredit);
+                node.subGroups.push_back(std::move(childNode));
+            }
         }
-        n.closingDebit = cDr;
-        n.closingCredit = cCr;
+
+        node.closingDebit = cDr;
+        node.closingCredit = cCr;
         if (cDr >= cCr) {
-            n.netClosingBalance = cDr.sub(cCr);
-            n.closingSide = domain::BalanceType::Dr;
+            node.netClosingBalance = cDr.sub(cCr);
+            node.closingSide = domain::BalanceType::Dr;
         } else {
-            n.netClosingBalance = cCr.sub(cDr);
-            n.closingSide = domain::BalanceType::Cr;
+            node.netClosingBalance = cCr.sub(cDr);
+            node.closingSide = domain::BalanceType::Cr;
         }
+
+        return node;
     };
 
-    for (auto& r : rootNodes) {
-        rollupNode(rollupNode, r);
+    std::vector<TrialBalanceGroupNode> rootNodes;
+    for (const auto& rootId : rootGroupIds) {
+        auto rNode = buildNode(rootId);
+        if (!includeZeroBalances && rNode.closingDebit.isZero() && rNode.closingCredit.isZero()) {
+            continue;
+        }
+        rootNodes.push_back(std::move(rNode));
     }
 
     report.groups = std::move(rootNodes);
@@ -399,36 +413,67 @@ ProfitAndLossReport ReportService::generateProfitAndLoss(
         ledgersByGroup[l.groupId].push_back(d);
     }
 
-    auto buildSections = [&](const std::vector<GroupDef>& groups) -> std::vector<PnLGroupSection> {
-        std::map<std::string, PnLGroupSection> sMap;
-        for (const auto& g : groups) {
-            PnLGroupSection s;
-            s.groupId = g.id;
-            s.groupName = g.name;
-            s.ledgers = ledgersByGroup[g.id];
-            sMap[g.id] = s;
+    // Helper to determine if a group affects gross profit, traversing up to parent if needed
+    auto doesAffectGrossProfit = [&](const GroupDef& g, auto& self) -> bool {
+        if (g.parentId.has_value() && !g.parentId->empty() && groupMap.find(*g.parentId) != groupMap.end()) {
+            return groupMap[*g.parentId].affectsGrossProfit || g.affectsGrossProfit;
         }
+        return g.affectsGrossProfit;
+    };
 
-        std::vector<PnLGroupSection> roots;
-        for (const auto& g : groups) {
-            if (g.parentId && sMap.find(*g.parentId) != sMap.end()) {
-                sMap[*g.parentId].subGroups.push_back(sMap[g.id]);
+    auto buildSectionsForCategory = [&](domain::GroupNature nature, bool affectsGP) -> std::vector<PnLGroupSection> {
+        std::map<std::string, std::vector<std::string>> childMap;
+        std::vector<std::string> categoryRootIds;
+
+        for (const auto& g : pnlGroups) {
+            if (g.nature != nature) continue;
+            bool agp = doesAffectGrossProfit(g, doesAffectGrossProfit);
+            if (agp != affectsGP) continue;
+
+            bool parentInCategory = false;
+            if (g.parentId.has_value() && !g.parentId->empty() && groupMap.find(*g.parentId) != groupMap.end()) {
+                const auto& parent = groupMap[*g.parentId];
+                if (parent.nature == nature && doesAffectGrossProfit(parent, doesAffectGrossProfit) == affectsGP) {
+                    parentInCategory = true;
+                }
+            }
+
+            if (parentInCategory) {
+                childMap[*g.parentId].push_back(g.id);
             } else {
-                roots.push_back(sMap[g.id]);
+                categoryRootIds.push_back(g.id);
             }
         }
 
-        auto calcTotal = [](auto& self, PnLGroupSection& sec) -> void {
+        std::function<PnLGroupSection(const std::string&)> buildSec = [&](const std::string& gid) -> PnLGroupSection {
+            const auto& g = groupMap[gid];
+            PnLGroupSection sec;
+            sec.groupId = g.id;
+            sec.groupName = g.name;
+            sec.ledgers = ledgersByGroup[g.id];
+
             domain::ExactDecimal tot = domain::ExactDecimal::zero();
-            for (const auto& l : sec.ledgers) tot = tot.add(l.amount);
-            for (auto& sg : sec.subGroups) {
-                self(self, sg);
-                tot = tot.add(sg.totalAmount);
+            for (const auto& l : sec.ledgers) {
+                tot = tot.add(l.amount);
+            }
+
+            auto it = childMap.find(gid);
+            if (it != childMap.end()) {
+                for (const auto& cid : it->second) {
+                    auto childSec = buildSec(cid);
+                    tot = tot.add(childSec.totalAmount);
+                    sec.subGroups.push_back(std::move(childSec));
+                }
             }
             sec.totalAmount = tot;
+            return sec;
         };
 
-        for (auto& r : roots) calcTotal(calcTotal, r);
+        std::vector<PnLGroupSection> roots;
+        for (const auto& rid : categoryRootIds) {
+            auto sec = buildSec(rid);
+            roots.push_back(std::move(sec));
+        }
         return roots;
     };
 
@@ -439,15 +484,11 @@ ProfitAndLossReport ReportService::generateProfitAndLoss(
     };
 
     // 1. Direct Income
-    std::vector<GroupDef> dirIncGroups;
-    for (const auto& g : pnlGroups) if (g.nature == domain::GroupNature::Income && g.affectsGrossProfit) dirIncGroups.push_back(g);
-    report.tradingAccount.directIncomeSections = buildSections(dirIncGroups);
+    report.tradingAccount.directIncomeSections = buildSectionsForCategory(domain::GroupNature::Income, true);
     report.tradingAccount.directIncomeTotal = sumSections(report.tradingAccount.directIncomeSections);
 
     // 2. Direct Expense
-    std::vector<GroupDef> dirExpGroups;
-    for (const auto& g : pnlGroups) if (g.nature == domain::GroupNature::Expense && g.affectsGrossProfit) dirExpGroups.push_back(g);
-    report.tradingAccount.directExpenseSections = buildSections(dirExpGroups);
+    report.tradingAccount.directExpenseSections = buildSectionsForCategory(domain::GroupNature::Expense, true);
     report.tradingAccount.directExpensesTotal = sumSections(report.tradingAccount.directExpenseSections);
 
     // Gross Profit = Direct Income - Direct Expense
@@ -462,15 +503,11 @@ ProfitAndLossReport ReportService::generateProfitAndLoss(
     }
 
     // 3. Indirect Income
-    std::vector<GroupDef> indirIncGroups;
-    for (const auto& g : pnlGroups) if (g.nature == domain::GroupNature::Income && !g.affectsGrossProfit) indirIncGroups.push_back(g);
-    report.operatingAccount.indirectIncomeSections = buildSections(indirIncGroups);
+    report.operatingAccount.indirectIncomeSections = buildSectionsForCategory(domain::GroupNature::Income, false);
     report.operatingAccount.indirectIncomeTotal = sumSections(report.operatingAccount.indirectIncomeSections);
 
     // 4. Indirect Expense
-    std::vector<GroupDef> indirExpGroups;
-    for (const auto& g : pnlGroups) if (g.nature == domain::GroupNature::Expense && !g.affectsGrossProfit) indirExpGroups.push_back(g);
-    report.operatingAccount.indirectExpenseSections = buildSections(indirExpGroups);
+    report.operatingAccount.indirectExpenseSections = buildSectionsForCategory(domain::GroupNature::Expense, false);
     report.operatingAccount.indirectExpensesTotal = sumSections(report.operatingAccount.indirectExpenseSections);
 
     // Net Profit = Gross Profit + Indirect Income - Indirect Expense

@@ -101,6 +101,37 @@ void ProfitLossView::refreshData() {
     m_titleLabel->setText(QString("Profit & Loss A/c: %1").arg(QString::fromStdString(report.companyName)));
     m_tree->clear();
 
+    std::function<void(QTreeWidgetItem*, const services::PnLGroupSection&)> populateSection =
+        [&](QTreeWidgetItem* parent, const services::PnLGroupSection& sec) {
+        if (sec.totalAmount.isZero() && sec.ledgers.empty() && sec.subGroups.empty()) return;
+
+        QTreeWidgetItem* container = parent;
+        if (!sec.subGroups.empty() || sec.ledgers.size() > 1) {
+            QTreeWidgetItem* grpItem = new QTreeWidgetItem(parent);
+            grpItem->setText(0, QString::fromStdString(sec.groupName));
+            grpItem->setText(1, QString::fromStdString(sec.totalAmount.formatInr(false)));
+            grpItem->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+            QFont gf = grpItem->font(0);
+            gf.setBold(true);
+            grpItem->setFont(0, gf);
+            grpItem->setExpanded(true);
+            container = grpItem;
+        }
+
+        for (const auto& l : sec.ledgers) {
+            if (l.amount.isZero()) continue;
+            QTreeWidgetItem* li = new QTreeWidgetItem(container);
+            li->setText(0, QString::fromStdString("   " + l.ledgerName));
+            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
+            li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
+            li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+        }
+
+        for (const auto& child : sec.subGroups) {
+            populateSection(container, child);
+        }
+    };
+
     // 1. Trading Account
     QTreeWidgetItem* tradingHeader = new QTreeWidgetItem(m_tree);
     tradingHeader->setText(0, "TRADING ACCOUNT");
@@ -114,12 +145,7 @@ void ProfitLossView::refreshData() {
     diHeader->setText(1, QString::fromStdString(report.tradingAccount.directIncomeTotal.formatInr(false)));
     diHeader->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     for (const auto& sec : report.tradingAccount.directIncomeSections) {
-        for (const auto& l : sec.ledgers) {
-            QTreeWidgetItem* li = new QTreeWidgetItem(diHeader);
-            li->setText(0, QString::fromStdString("   " + l.ledgerName));
-            li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
-            li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
-        }
+        populateSection(diHeader, sec);
     }
 
     // Direct Expenses
@@ -128,13 +154,7 @@ void ProfitLossView::refreshData() {
     deHeader->setText(1, QString::fromStdString(report.tradingAccount.directExpensesTotal.formatInr(false)));
     deHeader->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     for (const auto& sec : report.tradingAccount.directExpenseSections) {
-        for (const auto& l : sec.ledgers) {
-            QTreeWidgetItem* li = new QTreeWidgetItem(deHeader);
-            li->setText(0, QString::fromStdString("   " + l.ledgerName));
-            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
-            li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
-            li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
-        }
+        populateSection(deHeader, sec);
     }
 
     // Gross Profit
@@ -163,6 +183,9 @@ void ProfitLossView::refreshData() {
         iiHeader->setText(0, "Indirect Incomes");
         iiHeader->setText(1, QString::fromStdString(report.operatingAccount.indirectIncomeTotal.formatInr(false)));
         iiHeader->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+        for (const auto& sec : report.operatingAccount.indirectIncomeSections) {
+            populateSection(iiHeader, sec);
+        }
         iiHeader->setExpanded(true);
     }
 
@@ -172,13 +195,7 @@ void ProfitLossView::refreshData() {
     ieHeader->setText(1, QString::fromStdString(report.operatingAccount.indirectExpensesTotal.formatInr(false)));
     ieHeader->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
     for (const auto& sec : report.operatingAccount.indirectExpenseSections) {
-        for (const auto& l : sec.ledgers) {
-            QTreeWidgetItem* li = new QTreeWidgetItem(ieHeader);
-            li->setText(0, QString::fromStdString("   " + l.ledgerName));
-            li->setData(0, Qt::UserRole, QString::fromStdString(l.ledgerId));
-            li->setText(1, QString::fromStdString(l.amount.formatInr(false)));
-            li->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
-        }
+        populateSection(ieHeader, sec);
     }
     ieHeader->setExpanded(true);
 

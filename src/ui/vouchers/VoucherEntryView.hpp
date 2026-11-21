@@ -26,6 +26,7 @@ public:
 
     void setCompanyId(const std::string& companyId);
     void setVoucherCategory(domain::VoucherCategory category);
+    void loadVoucher(const std::string& voucherId);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -35,6 +36,7 @@ private slots:
     void onPostVoucher();
     void onCategoryButtonClicked(domain::VoucherCategory category);
     void onAddRowClicked();
+    void onRemoveRowClicked();
 
 private:
     void setupUi();

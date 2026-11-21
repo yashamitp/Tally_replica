@@ -125,32 +125,41 @@ DayBookResult DayBookService::getDayBook(const DayBookFilter& filter) {
 
         std::vector<std::string> drNames;
         std::vector<std::string> crNames;
+        bool isCancelled = (item.status == domain::VoucherStatus::Cancelled);
+
         for (const auto& e : item.entries) {
             if (e.entryType == domain::BalanceType::Dr) {
                 drNames.push_back(e.ledgerName);
-                sumDr = sumDr.add(e.amount);
+                if (!isCancelled) sumDr = sumDr.add(e.amount);
             } else {
                 crNames.push_back(e.ledgerName);
-                sumCr = sumCr.add(e.amount);
+                if (!isCancelled) sumCr = sumCr.add(e.amount);
             }
         }
 
+        std::string partText;
         if (drNames.size() == 1 && crNames.size() == 1) {
-            item.particulars = drNames[0] + " / " + crNames[0];
+            partText = drNames[0] + " / " + crNames[0];
         } else if (drNames.size() == 1) {
-            item.particulars = "To ";
+            partText = "To ";
             for (size_t i = 0; i < crNames.size(); ++i) {
-                if (i > 0) item.particulars += ", ";
-                item.particulars += crNames[i];
+                if (i > 0) partText += ", ";
+                partText += crNames[i];
             }
         } else if (crNames.size() == 1) {
-            item.particulars = "By ";
+            partText = "By ";
             for (size_t i = 0; i < drNames.size(); ++i) {
-                if (i > 0) item.particulars += ", ";
-                item.particulars += drNames[i];
+                if (i > 0) partText += ", ";
+                partText += drNames[i];
             }
         } else {
-            item.particulars = "As per details";
+            partText = "As per details";
+        }
+
+        if (isCancelled) {
+            item.particulars = "[CANCELLED] " + partText;
+        } else {
+            item.particulars = partText;
         }
     }
 

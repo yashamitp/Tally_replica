@@ -29,7 +29,8 @@ void runEndToEndAccountingWorkflows() {
     std::string companyId;
     {
         database::DatabaseManager db("E2E_Conn1");
-        assert(db.open(testDbFile) && "Database failed to open");
+        bool ok = db.open(testDbFile);
+        assert(ok && "Database failed to open");
 
         services::CompanyService compService(db);
 
@@ -68,7 +69,8 @@ void runEndToEndAccountingWorkflows() {
     // Verify persistence across restart (new connection / reload)
     {
         database::DatabaseManager db("E2E_Conn2");
-        assert(db.open(testDbFile) && "Failed to reopen database");
+        bool ok = db.open(testDbFile);
+        assert(ok && "Failed to reopen database");
         services::CompanyService compService(db);
 
         auto reloadedSetting = db.getSetting("last_active_company_id");
@@ -87,7 +89,8 @@ void runEndToEndAccountingWorkflows() {
     // =========================================================================
     std::cout << "\n--- WORKFLOW B: Group & Ledger Hierarchy Creation ---" << std::endl;
     database::DatabaseManager db("E2E_Workflows");
-    assert(db.open(testDbFile));
+    bool ok3 = db.open(testDbFile);
+    assert(ok3 && "Database failed to open");
 
     services::CompanyService compService(db);
     services::GroupService groupService(db);

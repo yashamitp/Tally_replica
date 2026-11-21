@@ -130,6 +130,27 @@ add_executable(test_e2e_workflows tests/integration/test_e2e_workflows.cpp)
 target_link_libraries(test_e2e_workflows PRIVATE TallyCore)
 add_test(NAME test_e2e_workflows COMMAND test_e2e_workflows)
 
+add_executable(test_trial_balance_nested tests/accounting/test_trial_balance_nested.cpp)
+target_link_libraries(test_trial_balance_nested PRIVATE TallyCore)
+add_test(NAME test_trial_balance_nested COMMAND test_trial_balance_nested)
+
+# Ensure assert() statements in test suites are always executed even in Release builds
+set(ALL_TEST_TARGETS
+    test_decimal
+    test_validation
+    test_accounting_engine
+    test_reconciliation
+    test_tally_xml
+    test_json_exchange
+    test_masters
+    test_backup_restore
+    test_e2e_workflows
+    test_trial_balance_nested
+)
+foreach(TGT ${ALL_TEST_TARGETS})
+    target_compile_options(${TGT} PRIVATE -UNDEBUG)
+endforeach()
+
 add_executable(capture_screenshots tools/capture_screenshots.cpp)
 target_link_libraries(capture_screenshots PRIVATE TallyUI TallyCore Qt6::Widgets)
 

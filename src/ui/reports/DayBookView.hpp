@@ -5,6 +5,7 @@
 #include <QLineEdit>
 #include <QLabel>
 #include <QPushButton>
+#include <QComboBox>
 #include "../../application/NavigationManager.hpp"
 #include "../../services/DayBookService.hpp"
 #include "../../services/VoucherService.hpp"
@@ -44,6 +45,7 @@ private:
 
     QLineEdit* m_fromDateEdit;
     QLineEdit* m_toDateEdit;
+    QComboBox* m_vchTypeCombo;
     QTableWidget* m_table;
     QLabel* m_totalDrLabel;
     QLabel* m_totalCrLabel;

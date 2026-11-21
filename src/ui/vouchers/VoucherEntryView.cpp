@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QComboBox>
+#include <QCompleter>
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QDate>
@@ -96,6 +97,11 @@ void VoucherEntryView::setupUi() {
     connect(addRowBtn, &QPushButton::clicked, this, &VoucherEntryView::onAddRowClicked);
     nLayout->addWidget(addRowBtn);
 
+    QPushButton* removeRowBtn = new QPushButton("- Remove Line (Ctrl+D)", this);
+    removeRowBtn->setStyleSheet("background-color: #C0392B; color: white; font-weight: bold; padding: 4px 10px;");
+    connect(removeRowBtn, &QPushButton::clicked, this, &VoucherEntryView::onRemoveRowClicked);
+    nLayout->addWidget(removeRowBtn);
+
     mainLayout->addLayout(nLayout);
 
     // 4. Bottom Summary & Accept Actions
@@ -158,6 +164,11 @@ void VoucherEntryView::addRow(const QString& defaultSide) {
     m_table->setCellWidget(r, 0, drcrCombo);
 
     QComboBox* ledgerCombo = new QComboBox(m_table);
+    ledgerCombo->setEditable(true);
+    if (ledgerCombo->completer()) {
+        ledgerCombo->completer()->setFilterMode(Qt::MatchContains);
+        ledgerCombo->completer()->setCaseSensitivity(Qt::CaseInsensitive);
+    }
     ledgerCombo->addItem("-- Select Ledger --", "");
     for (const auto& l : m_availableLedgers) {
         ledgerCombo->addItem(QString::fromStdString(l.name), QString::fromStdString(l.id));
@@ -222,6 +233,15 @@ void VoucherEntryView::onAddRowClicked() {
     addRow(side);
 }
 
+void VoucherEntryView::onRemoveRowClicked() {
+    int curRow = m_table->currentRow();
+    if (curRow < 0) curRow = m_table->rowCount() - 1;
+    if (curRow >= 0 && m_table->rowCount() > 2) {
+        m_table->removeRow(curRow);
+        updateTotals();
+    }
+}
+
 void VoucherEntryView::setCompanyId(const std::string& companyId) {
     m_companyId = companyId;
     loadLedgers();
@@ -267,6 +287,11 @@ void VoucherEntryView::loadLedgers() {
         if (combo) {
             std::string selectedId = combo->currentData().toString().toStdString();
             combo->clear();
+            combo->setEditable(true);
+            if (combo->completer()) {
+                combo->completer()->setFilterMode(Qt::MatchContains);
+                combo->completer()->setCaseSensitivity(Qt::CaseInsensitive);
+            }
             combo->addItem("-- Select Ledger --", "");
             int matchIdx = 0;
             for (size_t i = 0; i < m_availableLedgers.size(); ++i) {
@@ -277,6 +302,54 @@ void VoucherEntryView::loadLedgers() {
             combo->setCurrentIndex(matchIdx);
         }
     }
+}
+
+void VoucherEntryView::loadVoucher(const std::string& voucherId) {
+    auto optV = m_voucherService.getVoucher(voucherId);
+    if (!optV) return;
+    const auto& v = *optV;
+
+    m_vchNumberEdit->setText(QString::fromStdString(v.voucherNumber));
+    m_dateEdit->setText(QString::fromStdString(v.date));
+    updateDayName();
+    m_narrationEdit->setText(QString::fromStdString(v.narration.value_or("")));
+
+    auto vtypes = m_companyService.listVoucherTypes(m_companyId);
+    for (const auto& vt : vtypes) {
+        if (vt.id == v.voucherTypeId) {
+            m_currentCategory = vt.category;
+            m_voucherTypeId = vt.id;
+            std::string catName = domain::voucherCategoryToString(vt.category);
+            m_vchTypeTitleLabel->setText(QString("Accounting Voucher: %1 (Display/Alter)").arg(QString::fromStdString(catName)));
+            break;
+        }
+    }
+
+    m_table->setRowCount(0);
+    for (const auto& entry : v.entries) {
+        QString side = (entry.entryType == domain::BalanceType::Dr) ? "Dr" : "Cr";
+        addRow(side);
+        int r = m_table->rowCount() - 1;
+
+        auto* lCombo = qobject_cast<QComboBox*>(m_table->cellWidget(r, 1));
+        if (lCombo) {
+            for (int i = 0; i < lCombo->count(); ++i) {
+                if (lCombo->itemData(i).toString().toStdString() == entry.ledgerId) {
+                    lCombo->setCurrentIndex(i);
+                    break;
+                }
+            }
+        }
+
+        if (entry.entryType == domain::BalanceType::Dr) {
+            auto* dItem = m_table->item(r, 2);
+            if (dItem) dItem->setText(QString::fromStdString(entry.amount.toString()));
+        } else {
+            auto* cItem = m_table->item(r, 3);
+            if (cItem) cItem->setText(QString::fromStdString(entry.amount.toString()));
+        }
+    }
+    updateTotals();
 }
 
 void VoucherEntryView::onCellChanged(int row, int column) {
@@ -426,6 +499,9 @@ void VoucherEntryView::keyPressEvent(QKeyEvent* event) {
             return;
         } else if (event->key() == Qt::Key_N) {
             onAddRowClicked();
+            return;
+        } else if (event->key() == Qt::Key_D) {
+            onRemoveRowClicked();
             return;
         }
     }

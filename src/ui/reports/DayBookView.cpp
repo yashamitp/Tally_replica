@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
+#include <QComboBox>
 #include "../vouchers/VoucherDetailsDialog.hpp"
 
 namespace tally::ui {
@@ -48,6 +49,19 @@ void DayBookView::setupUi() {
     m_toDateEdit = new QLineEdit("2026-04-30", filterFrame);
     m_toDateEdit->setFixedWidth(100);
     fLayout->addWidget(m_toDateEdit);
+
+    QLabel* typeLbl = new QLabel("Type:", filterFrame);
+    fLayout->addWidget(typeLbl);
+    m_vchTypeCombo = new QComboBox(filterFrame);
+    m_vchTypeCombo->addItem("All Types", "");
+    m_vchTypeCombo->addItem("Payment", "Payment");
+    m_vchTypeCombo->addItem("Receipt", "Receipt");
+    m_vchTypeCombo->addItem("Contra", "Contra");
+    m_vchTypeCombo->addItem("Journal", "Journal");
+    m_vchTypeCombo->addItem("Sales", "Sales");
+    m_vchTypeCombo->addItem("Purchase", "Purchase");
+    connect(m_vchTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &DayBookView::refreshData);
+    fLayout->addWidget(m_vchTypeCombo);
 
     QPushButton* refreshBtn = new QPushButton("Refresh", filterFrame);
     refreshBtn->setStyleSheet("background-color: #1B4977; color: #FFFFFF; font-weight: bold; padding: 4px 12px;");
@@ -110,14 +124,21 @@ void DayBookView::refreshData() {
     filter.companyId = m_companyId;
     filter.fromDate = m_fromDateEdit->text().trimmed().toStdString();
     filter.toDate = m_toDateEdit->text().trimmed().toStdString();
+    if (m_vchTypeCombo && m_vchTypeCombo->currentIndex() > 0) {
+        std::string catStr = m_vchTypeCombo->currentData().toString().toStdString();
+        filter.category = domain::voucherCategoryFromString(catStr);
+    }
     filter.limit = 500;
 
     auto result = m_dayBookService.getDayBook(filter);
 
+    m_table->setSortingEnabled(false);
     m_table->setRowCount(0);
     for (const auto& item : result.items) {
         int r = m_table->rowCount();
         m_table->insertRow(r);
+
+        bool isCancelled = (item.status == domain::VoucherStatus::Cancelled);
 
         auto* dateItem = new QTableWidgetItem(QString::fromStdString(item.date));
         dateItem->setData(Qt::UserRole, QString::fromStdString(item.id));
@@ -128,7 +149,10 @@ void DayBookView::refreshData() {
 
         QString drText = "";
         QString crText = "";
-        if (item.voucherCategory == domain::VoucherCategory::Payment || item.voucherCategory == domain::VoucherCategory::Purchase) {
+        if (isCancelled) {
+            drText = "0.00";
+            crText = "0.00";
+        } else if (item.voucherCategory == domain::VoucherCategory::Payment || item.voucherCategory == domain::VoucherCategory::Purchase) {
             drText = QString::fromStdString(item.totalAmount.formatInr(false));
         } else if (item.voucherCategory == domain::VoucherCategory::Receipt || item.voucherCategory == domain::VoucherCategory::Sales) {
             crText = QString::fromStdString(item.totalAmount.formatInr(false));
@@ -144,7 +168,20 @@ void DayBookView::refreshData() {
         auto* cItem = new QTableWidgetItem(crText);
         cItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_table->setItem(r, 5, cItem);
+
+        if (isCancelled) {
+            for (int col = 0; col < 6; ++col) {
+                auto* itm = m_table->item(r, col);
+                if (itm) {
+                    itm->setForeground(QBrush(QColor("#888888")));
+                    QFont f = itm->font();
+                    f.setItalic(true);
+                    itm->setFont(f);
+                }
+            }
+        }
     }
+    m_table->setSortingEnabled(true);
 
     m_totalDrLabel->setText(QString::fromStdString(result.totalDebitSum.formatInr(false)));
     m_totalCrLabel->setText(QString::fromStdString(result.totalCreditSum.formatInr(false)));

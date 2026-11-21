@@ -4,6 +4,8 @@
 #include <QGroupBox>
 #include <QKeyEvent>
 #include <QApplication>
+#include <QSqlQuery>
+#include "../../utilities/DateUtils.hpp"
 
 namespace tally::ui {
 
@@ -154,6 +156,28 @@ void GatewayView::refreshCompanyInfo(const std::string& companyId) {
     auto comp = m_companyService.getCompany(companyId);
     if (comp) {
         m_companyNameLabel->setText(QString::fromStdString(comp->name));
+    }
+
+    // 1. Current Financial Period
+    QSqlQuery fyQ(m_companyService.dbManager().database());
+    fyQ.prepare("SELECT start_date, end_date FROM financial_years WHERE company_id = :cid ORDER BY start_date DESC LIMIT 1");
+    fyQ.bindValue(":cid", QString::fromStdString(companyId));
+    if (fyQ.exec() && fyQ.next()) {
+        std::string sDate = fyQ.value(0).toString().toStdString();
+        std::string eDate = fyQ.value(1).toString().toStdString();
+        m_periodLabel->setText(QString::fromStdString(
+            utilities::DateUtils::formatTallyDisplayDate(sDate) + " to " + utilities::DateUtils::formatTallyDisplayDate(eDate)));
+    }
+
+    // 2. Date of Last Entry
+    QSqlQuery vQ(m_companyService.dbManager().database());
+    vQ.prepare("SELECT MAX(date) FROM vouchers WHERE company_id = :cid AND is_cancelled = 0");
+    vQ.bindValue(":cid", QString::fromStdString(companyId));
+    if (vQ.exec() && vQ.next() && !vQ.value(0).isNull() && !vQ.value(0).toString().isEmpty()) {
+        std::string lastDate = vQ.value(0).toString().toStdString();
+        m_lastDateLabel->setText(QString::fromStdString(utilities::DateUtils::formatTallyDisplayDate(lastDate)));
+    } else {
+        m_lastDateLabel->setText("No Vouchers Entered");
     }
 }
 
